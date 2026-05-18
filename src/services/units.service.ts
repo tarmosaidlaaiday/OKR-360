@@ -11,11 +11,13 @@ export async function getUnits(): Promise<Unit[]> {
 }
 
 export async function saveUnits(units: Unit[]): Promise<void> {
-  // Delete removed units, upsert remaining
   const { error } = await supabase
     .from('units')
     .upsert(units.map((u, i) => ({ ...u, position: i })))
-  if (error) throw error
+  if (error) {
+    console.error('[saveUnits] failed', { message: error.message, code: (error as any).code, hint: (error as any).hint })
+    throw new Error(error.message)
+  }
 }
 
 export async function deleteUnit(id: string): Promise<void> {
@@ -30,7 +32,16 @@ export async function createUnit(unit: Omit<Unit, 'id'>): Promise<Unit> {
     .insert(unit)
     .select()
     .single()
-  if (error) throw error
+  if (error) {
+    console.error('[createUnit] failed', {
+      payload: unit,
+      message: error.message,
+      code: (error as any).code,
+      details: (error as any).details,
+      hint: (error as any).hint,
+    })
+    throw new Error(error.message)
+  }
   return data as Unit
 }
 

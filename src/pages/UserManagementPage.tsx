@@ -650,7 +650,29 @@ export function UserManagementPage() {
   const selectedUser = users.find(u => u.id === selectedId) ?? null
   const scopeUnitIds = new Set(scope.map(s => s.unit_id))
   const scopeUnitNames = units.filter(u => scope.some(s => s.unit_id === u.id && s.depth === 0)).map(u => u.name)
-  const flatUnits = units.map(u => ({ id: u.id, name: u.name }))
+
+  // Build tree-ordered flat list with indented names for selects
+  const flatUnits = useMemo(() => {
+    type N = { id: string; name: string; parent_id: string | null; children: N[] }
+    const byId = new Map<string, N>()
+    for (const u of units) byId.set(u.id, { id: u.id, name: u.name, parent_id: u.parent_id, children: [] })
+    const roots: N[] = []
+    for (const u of units) {
+      const node = byId.get(u.id)!
+      if (u.parent_id && byId.has(u.parent_id)) byId.get(u.parent_id)!.children.push(node)
+      else roots.push(node)
+    }
+    const result: { id: string; name: string }[] = []
+    function walk(nodes: N[], depth: number) {
+      for (const n of nodes) {
+        const prefix = depth === 0 ? '' : '\u00a0\u00a0\u00a0\u00a0'.repeat(depth) + '└ '
+        result.push({ id: n.id, name: prefix + n.name })
+        walk(n.children, depth + 1)
+      }
+    }
+    walk(roots, 0)
+    return result
+  }, [units])
 
   if (loading) return <div className="cd-page"><p className="cd-loading">Loading users…</p></div>
   if (error) return (

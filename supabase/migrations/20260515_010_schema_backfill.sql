@@ -183,7 +183,74 @@ UPDATE public.cycles SET status = 'archived'
 WHERE year = 2026 AND quarter = 1;
 
 
--- ── 10. people_units ─────────────────────────────────────────────────────────
+-- ── 10. Helper functions (must come before people_units RLS policies) ────────
+
+CREATE OR REPLACE FUNCTION public.is_global_admin()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT COALESCE(
+    (SELECT is_global_admin FROM public.profiles WHERE id = auth.uid()),
+    false
+  );
+$$;
+GRANT EXECUTE ON FUNCTION public.is_global_admin() TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.get_admin_scope(p_admin_id uuid)
+RETURNS TABLE(unit_id uuid, depth int)
+LANGUAGE plpgsql STABLE SECURITY DEFINER AS $$
+BEGIN
+  RETURN QUERY
+  WITH RECURSIVE scope AS (
+    SELECT u.id AS uid, 0 AS d
+    FROM public.units u
+    JOIN public.people_units pu ON pu.unit_id = u.id
+    WHERE pu.person_id = p_admin_id
+      AND pu.role IN ('admin', 'lead')
+
+    UNION ALL
+
+    SELECT u.id, s.d + 1
+    FROM public.units u
+    JOIN scope s ON u.parent_id = s.uid
+  )
+  SELECT DISTINCT uid AS unit_id, d AS depth FROM scope;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_admin_scope(uuid) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.can_manage_unit(p_unit_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT
+    public.is_global_admin()
+    OR
+    EXISTS (
+      SELECT 1 FROM public.get_admin_scope(auth.uid())
+      WHERE unit_id = p_unit_id
+    );
+$$;
+GRANT EXECUTE ON FUNCTION public.can_manage_unit(uuid) TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.touch_last_active()
+RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
+  UPDATE public.profiles SET last_active_at = now() WHERE id = auth.uid();
+$$;
+GRANT EXECUTE ON FUNCTION public.touch_last_active() TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.clear_must_change_password(p_target_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF auth.uid() = p_target_id OR public.is_global_admin() THEN
+    UPDATE public.profiles SET must_change_password = false WHERE id = p_target_id;
+  END IF;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.clear_must_change_password(uuid) TO authenticated;
+
+
+-- ── 11. people_units ─────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.people_units (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -232,17 +299,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 
--- ── 11. Helper functions ─────────────────────────────────────────────────────
-
-CREATE OR REPLACE FUNCTION public.is_global_admin()
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT COALESCE(
-    (SELECT is_global_admin FROM public.profiles WHERE id = auth.uid()),
-    false
-  );
-$$;
-GRANT EXECUTE ON FUNCTION public.is_global_admin() TO authenticated;
-
+-- ── 12. visible_units_for_person (needs people_units to exist first) ─────────
 
 CREATE OR REPLACE FUNCTION public.visible_units_for_person(p_person_id uuid)
 RETURNS TABLE(unit_id uuid) LANGUAGE sql STABLE SECURITY DEFINER AS $$
@@ -263,64 +320,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.visible_units_for_person(uuid) TO authenticated;
 
 
-CREATE OR REPLACE FUNCTION public.get_admin_scope(p_admin_id uuid)
-RETURNS TABLE(unit_id uuid, depth int)
-LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  WITH RECURSIVE scope AS (
-    SELECT u.id AS uid, 0 AS d
-    FROM public.units u
-    JOIN public.people_units pu ON pu.unit_id = u.id
-    WHERE pu.person_id = p_admin_id
-      AND pu.role IN ('admin', 'lead')
-
-    UNION ALL
-
-    SELECT u.id, s.d + 1
-    FROM public.units u
-    JOIN scope s ON u.parent_id = s.uid
-  )
-  SELECT DISTINCT uid AS unit_id, d AS depth FROM scope;
-$$;
-GRANT EXECUTE ON FUNCTION public.get_admin_scope(uuid) TO authenticated;
-
-
-CREATE OR REPLACE FUNCTION public.can_manage_unit(p_unit_id uuid)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
-  SELECT
-    public.is_global_admin()
-    OR
-    EXISTS (
-      SELECT 1 FROM public.get_admin_scope(auth.uid())
-      WHERE unit_id = p_unit_id
-    );
-$$;
-GRANT EXECUTE ON FUNCTION public.can_manage_unit(uuid) TO authenticated;
-
-
--- ── 12. touch_last_active RPC ────────────────────────────────────────────────
-
-CREATE OR REPLACE FUNCTION public.touch_last_active()
-RETURNS void LANGUAGE sql SECURITY DEFINER AS $$
-  UPDATE public.profiles SET last_active_at = now() WHERE id = auth.uid();
-$$;
-GRANT EXECUTE ON FUNCTION public.touch_last_active() TO authenticated;
-
-
--- ── 13. clear_must_change_password RPC ──────────────────────────────────────
-
-CREATE OR REPLACE FUNCTION public.clear_must_change_password(p_target_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  -- Only the user themselves or a global admin can clear this
-  IF auth.uid() = p_target_id OR public.is_global_admin() THEN
-    UPDATE public.profiles SET must_change_password = false WHERE id = p_target_id;
-  END IF;
-END;
-$$;
-GRANT EXECUTE ON FUNCTION public.clear_must_change_password(uuid) TO authenticated;
-
-
--- ── 14. Fix get_analytics: make robust when tables may be empty ───────────
+-- ── 13. Fix get_analytics: make robust when tables may be empty ───────────
 
 CREATE OR REPLACE FUNCTION public.get_analytics(
   p_cycle_id  uuid,
@@ -540,7 +540,7 @@ END; $$;
 GRANT EXECUTE ON FUNCTION public.get_analytics(uuid, uuid) TO authenticated;
 
 
--- ── 15. Mark current user as global admin ────────────────────────────────────
+-- ── 14. Mark current user as global admin ────────────────────────────────────
 -- Run once: set the first/only user as global admin.
 -- In production, replace with a specific email or user ID.
 

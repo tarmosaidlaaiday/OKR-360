@@ -16,12 +16,15 @@ function buildPreviewTree(units: Unit[]): UnitTreeNode[] {
   return roots
 }
 
-const NAV_ITEMS = [
-  { label: 'My Week',     icon: '⊞' },
-  { label: 'OKRs',        icon: '◎' },
+const NAV_ITEMS: { label: string; icon: string; section?: boolean }[] = [
+  { label: 'Dashboard',   icon: '⊞' },
+  { label: 'Objectives',  icon: '◎' },
   { label: 'KPIs',        icon: '↗' },
-  { label: 'Scorecard',   icon: '⊟' },
-  { label: '1-on-1s',     icon: '◯' },
+  { label: 'People',      icon: '◯' },
+  { label: 'Analytics',   icon: '⊟' },
+  { label: 'Organisation', icon: '', section: true },
+  { label: 'Structure',   icon: '⌘' },
+  { label: 'Users',       icon: '⊕' },
 ]
 
 interface PreviewNodeProps {
@@ -64,12 +67,16 @@ export function SidebarPreview({ levels, units }: SidebarPreviewProps) {
 
       {/* Nav */}
       <div className="cd-prev-nav">
-        {NAV_ITEMS.map((item, i) => (
-          <div key={item.label} className={'cd-prev-link' + (i === 0 ? ' is-active' : '')}>
-            <span className="cd-prev-link-icon">{item.icon}</span>
-            <span>{item.label}</span>
-          </div>
-        ))}
+        {NAV_ITEMS.map((item, i) =>
+          item.section ? (
+            <div key={item.label} className="cd-prev-section-label" style={{ marginTop: 6 }}>{item.label}</div>
+          ) : (
+            <div key={item.label} className={'cd-prev-link' + (i === 0 ? ' is-active' : '')}>
+              <span className="cd-prev-link-icon">{item.icon}</span>
+              <span>{item.label}</span>
+            </div>
+          )
+        )}
       </div>
 
       {/* Level legend */}
