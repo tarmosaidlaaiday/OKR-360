@@ -57,7 +57,12 @@ export function TopBar({
             onMarkAllRead={onMarkAllRead ?? (() => {})}
           />
           {onCheckin && (
-            <button className="cd-btn cd-btn--primary cd-btn--sm" onClick={onCheckin} type="button">
+            <button
+              className="cd-btn cd-btn--primary cd-btn--sm"
+              onClick={onCheckin}
+              type="button"
+              title="Update your key results for this week"
+            >
               <Icon name="check" size={13} />
               Check in
             </button>

@@ -122,7 +122,7 @@ button { font-family: inherit; }
 .cd-content {
   flex: 1;
   min-width: 0;
-  padding: 28px 36px 80px;
+  padding: 28px 32px 80px;
   max-width: 1500px;
   width: 100%;
   margin: 0 auto;
@@ -420,14 +420,18 @@ kbd.cd-kbd {
 .cd-card-body-flush { padding: 0; }
 
 .cd-link {
-  color: var(--ink-mid);
-  font-size: 12px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+  color: var(--accent);
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  display: inline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
 }
-.cd-link:hover { color: var(--ink); }
+.cd-link:hover { color: var(--ink); text-decoration: none; }
 
 /* ─── Avatars / chips ──────────────────────────────────────────────────── */
 .cd-avatar {

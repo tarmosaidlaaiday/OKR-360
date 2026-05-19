@@ -375,9 +375,6 @@ export function DashboardPage() {
     return m.manager_id === user?.id ? (m.report ?? null) : (m.manager ?? null)
   }
 
-  const objCount = myObjs.length
-  const krCount  = myObjs.reduce((s, o) => s + (o.key_results ?? []).length, 0)
-
   if (!user) return null
 
   return (
@@ -385,28 +382,34 @@ export function DashboardPage() {
       <PageHeader
         eyebrow={eyebrow}
         title={`${greeting()}, ${me?.name?.split(' ')[0] ?? 'there'}.`}
-        sub={`Org confidence sits at ${orgAvg}/10 this week. ${objCount} objective${objCount !== 1 ? 's' : ''}, ${krCount} key result${krCount !== 1 ? 's' : ''}, ${visibleTasks.length} task${visibleTasks.length !== 1 ? 's' : ''} for you.`}
+        sub={
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span>{`Org confidence sits at ${orgAvg}/10 · ${eyebrow ?? ''}`}</span>
+            {hasCheckedIn
+              ? <span style={{ color: 'var(--green)', fontSize: 12 }}>✓ Check-in submitted this week</span>
+              : <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                  Update your key results to keep the team aligned.{' '}
+                  <button
+                    className="cd-link"
+                    onClick={() => navigate('/check-in')}
+                    type="button"
+                  >
+                    Check-in takes 2 minutes.
+                  </button>
+                </span>
+            }
+          </span>
+        }
         actions={
-          <>
-            <Segmented<Period>
-              value={period}
-              onChange={setPeriod}
-              options={[
-                { value: 'day',  label: 'Day'     },
-                { value: 'week', label: 'Week'    },
-                { value: 'q',    label: 'Quarter' },
-              ]}
-            />
-            {hasCheckedIn ? (
-              <button className="cd-btn cd-btn-primary" disabled style={{ opacity: 0.7 }}>
-                <Icon name="check" size={14} /> Checked in
-              </button>
-            ) : (
-              <button className="cd-btn cd-btn-primary" onClick={() => navigate('/check-in')}>
-                <Icon name="check" size={14} /> Submit check-in
-              </button>
-            )}
-          </>
+          <Segmented<Period>
+            value={period}
+            onChange={setPeriod}
+            options={[
+              { value: 'day',  label: 'Day'     },
+              { value: 'week', label: 'Week'    },
+              { value: 'q',    label: 'Quarter' },
+            ]}
+          />
         }
       />
 
