@@ -1,0 +1,30 @@
+# For local development. Not required for production deployments.
+# Supabase CLI: https://supabase.com/docs/guides/cli
+
+project_id = "githzeldiwxkmruhaver"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[functions.admin-create-user]
+verify_jwt = false

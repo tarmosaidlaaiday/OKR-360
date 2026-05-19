@@ -167,18 +167,25 @@ export async function createUser(payload: {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
-  const resp = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ action: 'create', ...payload }),
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`
+  const body = JSON.stringify({ action: 'create', ...payload })
+  console.log('[createUser] calling', url)
+  console.log('[createUser] body', body)
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
     },
-  )
-  const json = await resp.json()
+    body,
+  })
+
+  const text = await resp.text()
+  console.log('[createUser] status', resp.status, 'response', text)
+
+  let json: any
+  try { json = JSON.parse(text) } catch { throw new Error(`Edge function returned non-JSON (${resp.status}): ${text.slice(0, 200)}`) }
   if (json.error) throw new Error(json.error)
   return { person_id: json.person_id }
 }
@@ -189,18 +196,19 @@ export async function resetUserPassword(personId: string, newPassword: string): 
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
-  const resp = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ action: 'reset-password', person_id: personId, new_password: newPassword }),
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
     },
-  )
-  const json = await resp.json()
+    body: JSON.stringify({ action: 'reset-password', person_id: personId, new_password: newPassword }),
+  })
+  const text = await resp.text()
+  console.log('[resetUserPassword] status', resp.status, 'response', text)
+  let json: any
+  try { json = JSON.parse(text) } catch { throw new Error(`Edge function error (${resp.status}): ${text.slice(0, 200)}`) }
   if (json.error) throw new Error(json.error)
 }
 
