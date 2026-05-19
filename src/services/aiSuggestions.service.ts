@@ -8,18 +8,22 @@ export interface KRSuggestion {
   unit: string | null
 }
 
-export async function suggestKRs(title: string, description?: string): Promise<KRSuggestion[]> {
+export async function suggestKRs(
+  objective_title: string,
+  unit_name?: string,
+  industry?: string,
+): Promise<KRSuggestion[]> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Not authenticated')
 
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-krs`
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-key-results`
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ title, description }),
+    body: JSON.stringify({ objective_title, unit_name, industry }),
   })
 
   const json = await resp.json()

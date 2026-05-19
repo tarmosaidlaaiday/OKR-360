@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useCycle } from '../context/CycleContext'
 import { useCadenceObjectives } from '../hooks/useCadenceObjectives'
 import { useOrg } from '../context/OrgContext'
+import { usePageActionStore } from '../stores/pageActionStore'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { ConfidenceTrend } from '../components/cadence/ConfidenceTrend'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -221,8 +222,8 @@ function AlignmentStat({ objectives }: { objectives: CadenceObjective[] }) {
 
 export function OKRsPage() {
   const { activeCycle } = useCycle()
-  const quarter = activeCycle ? parseInt(activeCycle.label.replace(/[^1-4]/g, '')) || 1 : 1
-  const year = activeCycle ? parseInt(activeCycle.label.replace(/\D+(\d{4}).*/, '$1')) || new Date().getFullYear() : new Date().getFullYear()
+  const quarter = activeCycle?.quarter ?? 1
+  const year = activeCycle?.year ?? new Date().getFullYear()
 
   const { objectives, loading } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
   const { levels } = useOrg()
@@ -230,9 +231,17 @@ export function OKRsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
+  const { setObjectivesModalOpen } = usePageActionStore()
 
   const weeks = getQuarterWeeks(quarter)
-  const currentWeekIdx = getCurrentWeekIdx(quarter)
+
+  // Cycle-relative current week index: days since cycle start ÷ 7
+  const currentWeekIdx = activeCycle?.start_date
+    ? Math.max(0, Math.min(
+        Math.floor((Date.now() - new Date(activeCycle.start_date).getTime()) / (7 * 86400000)),
+        weeks.length - 1
+      ))
+    : getCurrentWeekIdx(quarter)
 
   function toggleExpand(id: string) {
     setExpanded(prev => {
@@ -312,13 +321,28 @@ export function OKRsPage() {
           <span className="cd-okr-col-progress">Progress</span>
           <div className="cd-okr-conf-header">
             {weeks.map((w, i) => (
-              <span key={w} className={'cd-okr-week' + (i === currentWeekIdx ? ' is-current' : '')}>W{w}</span>
+              <span key={w} className={'cd-okr-week' + (i === currentWeekIdx ? ' is-current' : '')}>W{i + 1}</span>
             ))}
           </div>
         </div>
 
         {displayRows.length === 0 && (
-          <p className="cd-empty-hint" style={{ padding: '2rem' }}>No objectives{levelFilter ? ' at this level' : ''} for this cycle.</p>
+          levelFilter ? (
+            <p className="cd-empty-hint" style={{ padding: '2rem' }}>No objectives at this level.</p>
+          ) : (
+            <div className="cd-okr-empty">
+              <Icon name="target" size={32} />
+              <p className="cd-okr-empty-title">No objectives for {activeCycle?.label ?? 'this cycle'} yet</p>
+              <p className="cd-okr-empty-sub">Create your first objective and add key results to start tracking your progress this quarter.</p>
+              <button
+                type="button"
+                className="cd-btn cd-btn--primary"
+                onClick={() => setObjectivesModalOpen(true)}
+              >
+                ✦ Add objective with AI →
+              </button>
+            </div>
+          )
         )}
 
         {displayRows.map(({ obj, depth }) => {

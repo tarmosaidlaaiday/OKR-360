@@ -14,6 +14,7 @@ import { Segmented } from '../components/cadence/Segmented'
 import { confidenceColor } from '../lib/colors'
 import { profileToPerson, getCurrentWeekIdx, getISOWeek } from '../lib/cadenceUtils'
 import { toggleTask, addQuickTask } from '../services/tasks.service'
+import { usePageActionStore } from '../stores/pageActionStore'
 import type { Task, OneOnOne, Person } from '../types/cadence'
 import type { CadenceObjective } from '../types/cadence'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -195,12 +196,11 @@ export function DashboardPage() {
   const { activeCycle }   = useCycle()
   const { isReviewing, selfAssessmentDue, reviewClosesAt, cycleLabel } = useReviewCycle()
 
-  const me      = profile ? profileToPerson(profile) : null
-  const quarter = activeCycle ? parseInt(activeCycle.label.replace(/[^1-4]/g, '')) || 1 : 1
-  const cycleYear = activeCycle
-    ? parseInt(activeCycle.label.replace(/\D+(\d{4}).*/, '$1')) || new Date().getFullYear()
-    : new Date().getFullYear()
+  const me       = profile ? profileToPerson(profile) : null
+  const quarter  = activeCycle?.quarter ?? 1
+  const cycleYear = activeCycle?.year ?? new Date().getFullYear()
 
+  const { setObjectivesModalOpen } = usePageActionStore()
   const [period, setPeriod]             = useState<Period>('week')
   const [tasks, setTasks]               = useState<Task[]>([])
   const [nextMeeting, setNextMeeting]   = useState<OneOnOne | null>(null)
@@ -385,15 +385,22 @@ export function DashboardPage() {
         sub={
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span>{`Org confidence sits at ${orgAvg}/10 · ${eyebrow ?? ''}`}</span>
-            {hasCheckedIn
+            {myObjs.length === 0
+              ? <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                  Start by adding your first objective for {activeCycle?.label ?? 'this quarter'}.{' '}
+                  <button
+                    className="cd-link"
+                    onClick={() => { setObjectivesModalOpen(true); navigate('/objectives') }}
+                    type="button"
+                  >
+                    + Add objective →
+                  </button>
+                </span>
+              : hasCheckedIn
               ? <span style={{ color: 'var(--green)', fontSize: 12 }}>✓ Check-in submitted this week</span>
               : <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
                   Update your key results to keep the team aligned.{' '}
-                  <button
-                    className="cd-link"
-                    onClick={() => navigate('/check-in')}
-                    type="button"
-                  >
+                  <button className="cd-link" onClick={() => navigate('/check-in')} type="button">
                     Check-in takes 2 minutes.
                   </button>
                 </span>
@@ -449,8 +456,17 @@ export function DashboardPage() {
             />
             <div className="cd-obj-list">
               {myObjs.length === 0 && (
-                <div className="cd-empty" style={{ padding: '16px 0' }}>
-                  No objectives this cycle.
+                <div className="cd-dash-empty">
+                  <Icon name="target" size={28} />
+                  <p className="cd-dash-empty-title">No objectives yet</p>
+                  <p className="cd-dash-empty-sub">Add your first objective to start tracking progress</p>
+                  <button
+                    type="button"
+                    className="cd-btn cd-btn--primary cd-btn--sm"
+                    onClick={() => { setObjectivesModalOpen(true); navigate('/objectives') }}
+                  >
+                    + Add objective
+                  </button>
                 </div>
               )}
               {myObjs.map(o => (

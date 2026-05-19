@@ -2487,13 +2487,22 @@ kbd.cd-kbd {
 
 /* ── AI KR suggestions ───────────────────────────────────────────────────── */
 .cd-ai-suggest-btn {
-  color: var(--accent);
-  border-color: var(--accent-line);
+  display: inline-flex;
+  align-items: center;
   gap: 5px;
+  background: #EEEDFE;
+  color: #534AB7;
+  border: 1px solid #AFA9EC;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: opacity 120ms;
+  font-family: inherit;
 }
-.cd-ai-suggest-btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-}
+.cd-ai-suggest-btn:hover:not(:disabled) { opacity: 0.85; }
+.cd-ai-suggest-btn:disabled { opacity: 0.5; cursor: default; }
 .cd-ai-suggestions {
   background: var(--accent-soft);
   border: 1px solid var(--accent-line);
@@ -2528,8 +2537,8 @@ kbd.cd-kbd {
   transition: border-color 120ms;
 }
 .cd-ai-suggestion-row.is-checked {
-  border-color: var(--accent-line);
-  background: #fff;
+  border-color: #534AB7;
+  background: #EEEDFE;
 }
 .cd-ai-suggestion-chk {
   margin-top: 2px;
@@ -2552,6 +2561,76 @@ kbd.cd-kbd {
   font-size: 11px;
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Check-in button states ──────────────────────────────────────────────── */
+.cd-checkin-btn-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.cd-checkin-due-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--bg);
+  z-index: 1;
+}
+.cd-checkin-done-btn {
+  background: var(--bg-elev);
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+  cursor: default;
+  opacity: 0.8;
+}
+
+/* ── Dashboard empty state ───────────────────────────────────────────────── */
+.cd-dash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.cd-dash-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  margin: 0;
+}
+.cd-dash-empty-sub {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0 0 4px;
+}
+
+/* ── OKRs page empty state ───────────────────────────────────────────────── */
+.cd-okr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 32px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.cd-okr-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  margin: 0;
+}
+.cd-okr-empty-sub {
+  font-size: 13px;
+  color: var(--ink-faint);
+  max-width: 360px;
+  line-height: 1.5;
+  margin: 0 0 8px;
 }
 
 /* ── Check-in stepper ────────────────────────────────────────────────────── */

@@ -80,16 +80,16 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   }, [objective])
 
   async function handleSuggest() {
-    if (title.trim().length < 8) return
+    if (title.trim().length < 4) return
     setAiLoading(true)
     setAiError('')
     setSuggestions([])
     try {
-      const results = await suggestKRs(title.trim(), description.trim() || undefined)
+      const results = await suggestKRs(title.trim())
       setSuggestions(results)
-      setAccepted(new Set(results.map((_, i) => i)))
+      setAccepted(new Set()) // unchecked by default — user opts in
     } catch (e) {
-      setAiError(e instanceof Error ? e.message : 'Could not generate suggestions')
+      setAiError(e instanceof Error ? e.message : "Couldn't generate suggestions — add key results manually")
     } finally {
       setAiLoading(false)
     }
@@ -154,7 +154,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     }
   }
 
-  const canSuggest = !isEdit && title.trim().length >= 8
+  const canSuggest = !isEdit && title.trim().length >= 4
 
   return (
     <CdModal open={open} onClose={onClose} title={isEdit ? 'Edit Objective' : 'New Objective'} width={540}>
@@ -200,12 +200,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
             {canSuggest && (
               <button
                 type="button"
-                className="cd-btn cd-btn--ghost cd-btn--sm cd-ai-suggest-btn"
+                className="cd-ai-suggest-btn"
                 onClick={handleSuggest}
                 disabled={aiLoading}
               >
-                <Icon name="sparkle" size={13} />
-                {aiLoading ? 'Generating…' : suggestions.length > 0 ? 'Regenerate with AI' : 'Suggest KRs with AI'}
+                ✦ {aiLoading ? 'Thinking…' : suggestions.length > 0 ? 'Regenerate with AI' : 'Suggest key results with AI'}
               </button>
             )}
           </div>
@@ -218,8 +217,8 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         {suggestions.length > 0 && (
           <div className="cd-ai-suggestions">
             <div className="cd-ai-suggestions-header">
-              <Icon name="sparkle" size={12} />
-              <span>AI-suggested key results — select the ones to create</span>
+              <span>✦</span>
+              <span>Select the key results you want to keep, then customise them</span>
             </div>
             <div className="cd-ai-suggestions-list">
               {suggestions.map((s, i) => (

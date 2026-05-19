@@ -7,12 +7,14 @@ import { SampleDataBanner } from './SampleDataBanner'
 import { useNotifications } from '../../hooks/useNotifications'
 import { useReviewCycle } from '../../hooks/useReviewCycle'
 import { useSampleData } from '../../hooks/useSampleData'
+import { useWeeklyCheckin } from '../../hooks/useWeeklyCheckin'
 
 export function AppShell() {
   const navigate = useNavigate()
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
   const { selfAssessmentDue, cycleLabel, reviewClosesAt } = useReviewCycle()
   const { hasSampleData, clearing, clearSampleData } = useSampleData()
+  const { krs, isDone, isCheckInDue } = useWeeklyCheckin()
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   return (
@@ -25,6 +27,9 @@ export function AppShell() {
           onMarkRead={markRead}
           onMarkAllRead={markAllRead}
           onCheckin={() => navigate('/check-in')}
+          hasKRs={krs.length > 0}
+          checkedIn={isDone}
+          checkInDue={isCheckInDue}
         />
         {hasSampleData && <SampleDataBanner onClear={clearSampleData} clearing={clearing} />}
         {selfAssessmentDue && !bannerDismissed && (

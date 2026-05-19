@@ -13,6 +13,9 @@ interface TopBarProps {
   onMarkRead?: (id: string) => void
   onMarkAllRead?: () => void
   onCheckin?: () => void
+  hasKRs?: boolean
+  checkedIn?: boolean
+  checkInDue?: boolean
 }
 
 export function TopBar({
@@ -22,6 +25,9 @@ export function TopBar({
   onMarkRead,
   onMarkAllRead,
   onCheckin,
+  hasKRs = false,
+  checkedIn = false,
+  checkInDue = false,
 }: TopBarProps) {
   const [cmdOpen, setCmdOpen] = useState(false)
   const action = usePageAction()
@@ -56,16 +62,31 @@ export function TopBar({
             onMarkRead={onMarkRead ?? (() => {})}
             onMarkAllRead={onMarkAllRead ?? (() => {})}
           />
-          {onCheckin && (
-            <button
-              className="cd-btn cd-btn--primary cd-btn--sm"
-              onClick={onCheckin}
-              type="button"
-              title="Update your key results for this week"
-            >
-              <Icon name="check" size={13} />
-              Check in
-            </button>
+          {onCheckin && hasKRs && (
+            checkedIn ? (
+              <button
+                className="cd-btn cd-btn--sm cd-checkin-done-btn"
+                type="button"
+                disabled
+                title="Update the progress on your key results — takes 2 minutes"
+              >
+                <Icon name="check" size={13} />
+                Checked in
+              </button>
+            ) : (
+              <div className="cd-checkin-btn-wrap">
+                {checkInDue && <span className="cd-checkin-due-dot" />}
+                <button
+                  className="cd-btn cd-btn--primary cd-btn--sm"
+                  onClick={onCheckin}
+                  type="button"
+                  title="Update the progress on your key results — takes 2 minutes"
+                >
+                  <Icon name="check" size={13} />
+                  Weekly check-in
+                </button>
+              </div>
+            )
           )}
           {action && (
             <button
