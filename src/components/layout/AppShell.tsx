@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { ReviewBanner } from './ReviewBanner'
@@ -9,6 +9,7 @@ import { useReviewCycle } from '../../hooks/useReviewCycle'
 import { useSampleData } from '../../hooks/useSampleData'
 
 export function AppShell() {
+  const navigate = useNavigate()
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
   const { selfAssessmentDue, cycleLabel, reviewClosesAt } = useReviewCycle()
   const { hasSampleData, clearing, clearSampleData } = useSampleData()
@@ -23,6 +24,7 @@ export function AppShell() {
           unreadCount={unreadCount}
           onMarkRead={markRead}
           onMarkAllRead={markAllRead}
+          onCheckin={() => navigate('/check-in')}
         />
         {hasSampleData && <SampleDataBanner onClear={clearSampleData} clearing={clearing} />}
         {selfAssessmentDue && !bannerDismissed && (

@@ -12,6 +12,7 @@ interface TopBarProps {
   unreadCount?: number
   onMarkRead?: (id: string) => void
   onMarkAllRead?: () => void
+  onCheckin?: () => void
 }
 
 export function TopBar({
@@ -20,6 +21,7 @@ export function TopBar({
   unreadCount = 0,
   onMarkRead,
   onMarkAllRead,
+  onCheckin,
 }: TopBarProps) {
   const [cmdOpen, setCmdOpen] = useState(false)
   const action = usePageAction()
@@ -54,6 +56,12 @@ export function TopBar({
             onMarkRead={onMarkRead ?? (() => {})}
             onMarkAllRead={onMarkAllRead ?? (() => {})}
           />
+          {onCheckin && (
+            <button className="cd-btn cd-btn--primary cd-btn--sm" onClick={onCheckin} type="button">
+              <Icon name="check" size={13} />
+              Check in
+            </button>
+          )}
           {action && (
             <button
               className="cd-btn cd-btn--primary"
