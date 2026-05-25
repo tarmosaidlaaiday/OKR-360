@@ -3,6 +3,7 @@ import { useCycle } from '../context/CycleContext'
 import { useCadenceObjectives } from '../hooks/useCadenceObjectives'
 import { useOrg } from '../context/OrgContext'
 import { usePageActionStore } from '../stores/pageActionStore'
+import { EmptyState } from '../components/cadence/EmptyState'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { ConfidenceTrend } from '../components/cadence/ConfidenceTrend'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -328,20 +329,14 @@ export function OKRsPage() {
 
         {displayRows.length === 0 && (
           levelFilter ? (
-            <p className="cd-empty-hint" style={{ padding: '2rem' }}>No objectives at this level.</p>
+            <EmptyState icon="filter" title="No objectives at this level" />
           ) : (
-            <div className="cd-okr-empty">
-              <Icon name="target" size={32} />
-              <p className="cd-okr-empty-title">No objectives for {activeCycle?.label ?? 'this cycle'} yet</p>
-              <p className="cd-okr-empty-sub">Create your first objective and add key results to start tracking your progress this quarter.</p>
-              <button
-                type="button"
-                className="cd-btn cd-btn--primary"
-                onClick={() => setObjectivesModalOpen(true)}
-              >
-                ✦ Add objective with AI →
-              </button>
-            </div>
+            <EmptyState
+              icon="target"
+              title={`No objectives for ${activeCycle?.label ?? 'this cycle'} yet`}
+              description="Create your first objective and add key results to start tracking your progress this quarter."
+              action={{ label: 'Add objective', onClick: () => setObjectivesModalOpen(true) }}
+            />
           )
         )}
 

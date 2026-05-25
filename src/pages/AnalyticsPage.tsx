@@ -13,6 +13,7 @@ import { PageHeader } from '../components/cadence/PageHeader'
 import { Card, CardHeader } from '../components/cadence/Card'
 import { Icon } from '../components/cadence/Icon'
 import { getISOWeek } from '../lib/cadenceUtils'
+import { EmptyState } from '../components/cadence/EmptyState'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ function StatCard({ label, value, hint, tone }: {
     <div className={'cd-stat' + (tone ? ` cd-stat-${tone}` : '')}>
       <span className="cd-stat-label">{label}</span>
       <span className="cd-stat-value">{value}</span>
-      {hint && <span className="cd-stat-hint">{hint}</span>}
+      {hint && <span className="cd-stat-hint" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{hint}</span>}
     </div>
   )
 }
@@ -252,9 +253,11 @@ export function AnalyticsPage() {
               sub="Avg confidence per team by ISO week"
             />
             {weeklyConfPivot.length === 0 ? (
-              <div className="cd-empty" style={{ padding: '20px 0' }}>
-                No check-in data yet for this cycle.
-              </div>
+              <EmptyState
+                icon="clock"
+                title="No check-in data yet"
+                description="Check-ins will appear here once your team starts submitting weekly updates"
+              />
             ) : (
               <div style={{ height: 260 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -299,7 +302,7 @@ export function AnalyticsPage() {
               <Card>
                 <CardHeader title="Check-in completion by team" sub={`W${currentWeek} · this week`} />
                 {teamCiData.length === 0 ? (
-                  <div className="cd-empty" style={{ padding: '20px 0' }}>No team data.</div>
+                  <EmptyState icon="users" title="No team data" />
                 ) : (
                   <div style={{ height: Math.max(120, teamCiData.length * 36 + 20) }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -334,7 +337,11 @@ export function AnalyticsPage() {
               <Card>
                 <CardHeader title="Cycle comparison" sub="Avg objective score" />
                 {cycleHistData.length === 0 ? (
-                  <div className="cd-empty" style={{ padding: '20px 0' }}>No cycle history.</div>
+                  <EmptyState
+                    icon="calendar"
+                    title="No previous cycles"
+                    description="Cycle comparison will appear after you complete your first review"
+                  />
                 ) : (
                   <div style={{ height: 200 }}>
                     <ResponsiveContainer width="100%" height="100%">
@@ -422,7 +429,7 @@ export function AnalyticsPage() {
               <Card>
                 <CardHeader title="KPI health snapshot" sub="This cycle" />
                 {kpiPieData.length === 0 ? (
-                  <div className="cd-empty" style={{ padding: '20px 0' }}>No KPI data.</div>
+                  <EmptyState icon="chart-bar" title="No KPI data" />
                 ) : (
                   <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <ResponsiveContainer width="60%" height="100%">

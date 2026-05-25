@@ -31,7 +31,7 @@ export function usePageAction(): PageAction {
   if (pathname === '/dashboard') {
     if (!canCreate('checkin')) return null
     return {
-      label: '+ Check-in',
+      label: 'Check-in',
       icon: 'plus',
       onClick: () => navigate('/check-in'),
     }
@@ -40,7 +40,7 @@ export function usePageAction(): PageAction {
   if (pathname === '/objectives') {
     if (!canCreate('objective')) return null
     return {
-      label: '+ Add objective',
+      label: 'Add objective',
       icon: 'plus',
       onClick: () => store.setObjectivesModalOpen(true),
     }
@@ -49,7 +49,7 @@ export function usePageAction(): PageAction {
   if (pathname === '/kpis') {
     if (!canCreate('kpi')) return null
     return {
-      label: '+ Add KPI',
+      label: 'Add KPI',
       icon: 'plus',
       onClick: () => store.setKpiModalOpen(true),
     }
@@ -59,7 +59,7 @@ export function usePageAction(): PageAction {
     if (tab === 'scorecards') return null
     if (!canCreate('1on1')) return null
     return {
-      label: '+ New 1:1',
+      label: 'New 1:1',
       icon: 'plus',
       onClick: () => store.setNewMeetingOpen(true),
     }
@@ -68,7 +68,7 @@ export function usePageAction(): PageAction {
   if (pathname === '/settings/structure') {
     if (!canCreate('unit')) return null
     return {
-      label: '+ Add unit',
+      label: 'Add unit',
       icon: 'plus',
       onClick: () => store.setAddUnitOpen(true),
     }
@@ -77,7 +77,7 @@ export function usePageAction(): PageAction {
   if (pathname === '/settings/users') {
     if (!canCreate('user')) return null
     return {
-      label: '+ Add user',
+      label: 'Add user',
       icon: 'plus',
       onClick: () => store.setAddUserOpen(true),
     }

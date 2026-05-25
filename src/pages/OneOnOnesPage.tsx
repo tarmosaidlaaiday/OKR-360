@@ -12,6 +12,7 @@ import { confidenceColor } from '../lib/colors'
 import { happinessLabel } from '../lib/cadenceUtils'
 import { supabase } from '../lib/supabase'
 import { createDraftSession } from '../services/oneOnOnes.service'
+import { EmptyState } from '../components/cadence/EmptyState'
 import type { OneOnOneEntry, Person, CadenceObjective } from '../types/cadence'
 
 // ── Happiness track (header — shows last 4 values as ConfidenceCell row) ──
@@ -427,7 +428,11 @@ export function OneOnOnesPage() {
           )}
 
           {people.length === 0 && (
-            <p className="cd-empty-hint" style={{ padding: '12px' }}>No 1:1 partners found.</p>
+            <EmptyState
+              icon="message"
+              title="No 1:1 partners yet"
+              description="Add team members to start tracking your 1:1 meetings"
+            />
           )}
         </aside>
 

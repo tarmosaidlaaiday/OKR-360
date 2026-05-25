@@ -11,6 +11,7 @@ import { Icon } from '../components/cadence/Icon'
 import { fmt, isOnTrack, makeTrend } from '../lib/cadenceUtils'
 import { createKPI, getAdminUnits, getUnitMembers } from '../services/kpis.service'
 import type { KPI, Person } from '../types/cadence'
+import { EmptyState } from '../components/cadence/EmptyState'
 import { usePageTitle } from '../hooks/usePageTitle'
 
 // ── Delta chip (design-matching) ─────────────────────────────────────────
@@ -369,7 +370,12 @@ export function KPIsPage() {
           </div>
 
           {kpis.length === 0 && (
-            <p className="cd-empty-hint" style={{ padding: '2rem' }}>No KPIs for this cycle.</p>
+            <EmptyState
+              icon="chart-bar"
+              title="No KPIs for this cycle"
+              description="Track recurring metrics alongside your OKRs"
+              action={isAdmin ? { label: 'Add KPI', onClick: () => setAddOpen(true) } : undefined}
+            />
           )}
 
           {Object.entries(grouped).map(([role, items]) => (
