@@ -1,0 +1,165 @@
+-- ============================================================
+-- Schema Audit — 2026-05-27
+-- Purpose: Document table usage status based on src/ grep analysis.
+-- NO drops are executed here — this file is documentation only.
+-- ============================================================
+--
+-- Methodology:
+--   grep -rh "\.from(" src/ | grep -oE "from\('[a-z_-]+'\)" | sort | uniq -c
+--   + checked PostgREST join syntax (table:table_name(...)) separately
+--   + verified schema.sql + supabase/migrations/ CREATE TABLE statements
+--
+-- ============================================================
+-- SECTION 1 — TABLES CONFIRMED IN USE BY FRONTEND
+-- ============================================================
+--
+-- Active (directly queried via .from()):
+--
+--   profiles             — 10 refs — user identity, joined everywhere
+--   people_units         — 23 refs — unit membership, roles, is_primary flag
+--   objectives           — 15 refs — core OKR data
+--   key_results          — 5 refs  — KR data, owned by objective
+--   checkins             — 6 refs  — weekly check-in records (v2 schema)
+--   checkin_streaks      — 1 ref   — per-person weekly streak counter
+--   confidence_logs      — 2 refs  — per-KR per-week confidence sparkline data
+--                                    NOTE: still active; written by sync_kr_on_checkin
+--                                    trigger AND directly by confidence.service.ts.
+--                                    Not replaced by checkins.confidence column —
+--                                    they serve different purposes (sparkline history
+--                                    vs current-week value).
+--   cycles               — 8 refs  — quarter definition
+--   units                — 7 refs  — org structure nodes
+--   levels               — 3 refs  — org hierarchy level config (new, schema-org-structure.sql)
+--   kpis                 — 2 refs  — KPI definitions
+--   kpi_targets          — 2 refs  — annual KPI plans (replaces kpi_plans)
+--   kpi_snapshots        — 2 refs  — weekly KPI actuals (replaces kpi_actuals)
+--   notifications        — 5 refs  — in-app notification records
+--   notification_preferences — 2 refs — per-person per-type opt-in settings
+--   objective_reviews    — 3 refs  — review cycle scoring for objectives
+--   key_result_scores    — 4 refs  — review cycle scoring for KRs
+--   one_on_ones          — 6 refs  — 1:1 meeting records
+--   one_on_one_entries   — 6 refs  — per-session 1:1 form data (replaces one_on_one_items)
+--   org_settings         — 2 refs  — cascade behaviour flags per org
+--   organisations        — 3 refs  — multi-tenant org records
+--   retros               — 1 ref   — DashboardPage retro widget
+--   tasks                — 5 refs  — personal/objective-linked tasks
+--   initiatives          — 5 refs  — annual bets / strategic initiatives
+--   comments             — 4 refs  — threaded comments on objectives/KRs
+--   kr_tasks             — 4 refs  — KR-level sub-tasks
+--   teams                — 1 ref   — teams.service.ts + objectives.team_id join
+--                                    NOTE: still used by TeamsPage, SettingsPage,
+--                                    and objectives query. Not yet replaced by units.
+--
+-- Active (PostgREST join, no direct .from() call):
+--
+--   org_levels           — 4 hooks join via `level:org_levels(id,name,depth,color)`
+--                          in useCadenceObjectives, useMyFocusObjectives,
+--                          useCascadeChain, useUnitDetail.
+--                          NOTE: both org_levels (schema-levels.sql) AND levels
+--                          (schema-org-structure.sql) exist. org_levels holds the
+--                          legacy depth+color data; levels is the newer configurable
+--                          version. Both are currently in use simultaneously.
+--
+-- ============================================================
+-- SECTION 2 — TABLES CONFIRMED ORPHANED (zero frontend references)
+-- ============================================================
+--
+-- These tables are defined in migrations but have no .from() calls,
+-- no PostgREST joins, and no TypeScript service/hook references in src/.
+--
+--   one_on_one_discussed_objectives
+--     Created in: 20260515000006_kpis_oneonones.sql
+--     Purpose:    Many-to-many between 1:1 sessions and objectives discussed.
+--     Status:     Zero frontend references. OneOnOnesPage uses one_on_one_entries
+--                 instead. Candidate for DROP.
+--
+--   audit_log
+--     Created in: 20260519000014_sample_data_and_permissions.sql
+--     Purpose:    Append-only log of admin actions.
+--     Status:     Zero frontend references. No admin UI built yet.
+--                 Keep for now — low cost, may be useful for compliance.
+--
+--   permissions
+--     Created in: 20260519000014_sample_data_and_permissions.sql
+--     Purpose:    Fine-grained role→action permission matrix.
+--     Status:     Zero frontend references. RLS policies are used instead.
+--                 Candidate for DROP.
+--
+-- Tables mentioned in the original test report that DO NOT EXIST
+-- in any migration or schema file (never created):
+--
+--   cadence_objectives   — never defined; the app evolved away from this name
+--   cadence_key_results  — never defined
+--   cadence_checkins     — never defined
+--   kpi_plans            — never defined; replaced by kpi_targets from the start
+--   kpi_actuals          — never defined; replaced by kpi_snapshots from the start
+--   unit_kpis            — never defined
+--   cascade_links        — never defined
+--   cascade_snapshots    — never defined
+--   one_on_one_items     — never defined; schema-cadence.sql has one_on_ones
+--                          but items/entries table is one_on_one_entries
+--   hr_snapshots         — never defined
+--   meeting_items        — never defined
+--   people               — never defined as standalone; people_units covers membership
+--
+-- Conclusion: the reported schema drift was mostly phantom — the "legacy cadence"
+-- tables were never actually created in Supabase. The real DB is cleaner than
+-- the test report suggested.
+--
+-- ============================================================
+-- SECTION 3 — MISMATCHES TO VERIFY / FIX
+-- ============================================================
+--
+-- 1. confidence_logs:
+--    Frontend queries: confidence_logs (active)
+--    DB trigger also writes to it from checkins INSERT.
+--    No mismatch — working as designed.
+--
+-- 2. kpi_targets vs kpi_plans:
+--    Frontend queries: kpi_targets ✓
+--    'kpi_plans' was never created — no mismatch.
+--
+-- 3. kpi_snapshots vs kpi_actuals:
+--    Frontend queries: kpi_snapshots ✓
+--    'kpi_actuals' was never created — no mismatch.
+--
+-- 4. one_on_one_entries vs one_on_one_items:
+--    Frontend queries: one_on_one_entries ✓
+--    'one_on_one_items' was never created — no mismatch.
+--
+-- 5. teams vs units:
+--    Both exist. teams is the legacy simple table (name, description).
+--    units is the richer org-structure table (level_id, parent_id, position).
+--    Frontend uses BOTH:
+--      - objectives.team_id → teams (used by TeamsPage)
+--      - people_units.unit_id → units (used everywhere else)
+--    No immediate mismatch, but teams is a candidate for eventual consolidation
+--    into units once objectives.team_id is migrated.
+--
+-- 6. org_levels vs levels:
+--    Both exist, both used simultaneously.
+--    org_levels: simple table (name, depth, color) — used in PostgREST joins
+--    levels: richer table (name, color, position, enabled) — queried directly
+--    Not a mismatch, but worth consolidating in a future migration.
+--
+-- ============================================================
+-- SECTION 4 — RECOMMENDED FUTURE DROPS (after verification in prod)
+-- ============================================================
+--
+-- Phase 1 (safe — zero refs, clearly unused):
+--   DROP TABLE IF EXISTS public.one_on_one_discussed_objectives;
+--   DROP TABLE IF EXISTS public.permissions;
+--
+-- Phase 2 (after building admin UI or confirming not needed):
+--   DROP TABLE IF EXISTS public.audit_log;
+--
+-- Phase 3 (after migrating objectives.team_id → units and removing TeamsPage):
+--   DROP TABLE IF EXISTS public.teams;  -- currently still used
+--
+-- Phase 4 (after consolidating org_levels into levels):
+--   DROP TABLE IF EXISTS public.org_levels;
+--
+-- DO NOT EXECUTE DROPS IN THIS FILE.
+-- ============================================================
+
+SELECT 'Schema audit 2026-05-27 — documentation only, no changes made' AS status;
