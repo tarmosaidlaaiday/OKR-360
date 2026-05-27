@@ -1,6 +1,6 @@
 // Cadence domain types — independent of the original OKR types
 
-// Legacy alias kept for hooks that still reference org_levels table
+// OrgLevel — shape returned by the levels table join in objective hooks
 export interface OrgLevel {
   id: string
   name: string
