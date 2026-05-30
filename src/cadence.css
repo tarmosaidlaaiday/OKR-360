@@ -4428,3 +4428,101 @@ kbd.cd-kbd {
 }
 .cd-approvals-email { color: var(--ink-soft); font-size: 12px; }
 .cd-approvals-date { color: var(--ink-faint); font-size: 11px; margin-left: auto; }
+
+/* ── Editable KR draft cards (ObjectiveForm) ────────────────────────────── */
+.cd-kr-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.cd-kr-edit-title {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 2px 0;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 120ms;
+}
+.cd-kr-edit-title:focus { border-bottom-color: var(--accent); }
+.cd-kr-edit-title::placeholder { color: var(--ink-faint); font-weight: 400; }
+
+.cd-kr-edit-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cd-kr-edit-type {
+  font-size: 11px;
+  background: var(--bg-sub);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 4px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cd-kr-edit-target {
+  width: 80px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 1px 2px;
+  outline: none;
+  font-family: var(--font-mono, inherit);
+  color: var(--ink);
+  transition: border-color 120ms;
+}
+.cd-kr-edit-target:focus { border-bottom-color: var(--accent); }
+
+.cd-kr-edit-unit {
+  width: 56px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  padding: 1px 2px;
+  outline: none;
+  font-family: inherit;
+  color: var(--ink-soft);
+  transition: border-color 120ms;
+}
+.cd-kr-edit-unit:focus { border-bottom-color: var(--accent); }
+.cd-kr-edit-unit::placeholder { color: var(--ink-faint); }
+
+.cd-kr-edit-unit-fixed {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Add KR button */
+.cd-kr-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px dashed color-mix(in oklab, var(--accent) 40%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms, border-color 120ms;
+}
+.cd-kr-add-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
