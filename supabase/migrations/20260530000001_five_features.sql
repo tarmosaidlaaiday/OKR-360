@@ -10,23 +10,38 @@ ALTER TABLE public.checkins
   ADD COLUMN IF NOT EXISTS will_action text;
 
 -- ── Feature 5: Structured retro fields (individual, person-based) ─────────────
-ALTER TABLE public.retros
-  ADD COLUMN IF NOT EXISTS person_id    uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
-  ADD COLUMN IF NOT EXISTS parking_lot  text,
-  ADD COLUMN IF NOT EXISTS top_work     text,
-  ADD COLUMN IF NOT EXISTS notes_text   text,   -- 'notes' is reserved in some DBs
-  ADD COLUMN IF NOT EXISTS feedforward  text;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'retros'
+  ) THEN
+    ALTER TABLE public.retros
+      ADD COLUMN IF NOT EXISTS person_id    uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+      ADD COLUMN IF NOT EXISTS parking_lot  text,
+      ADD COLUMN IF NOT EXISTS top_work     text,
+      ADD COLUMN IF NOT EXISTS notes_text   text,
+      ADD COLUMN IF NOT EXISTS feedforward  text;
 
--- Unique: one individual retro per person per week
-CREATE UNIQUE INDEX IF NOT EXISTS retros_person_week_year_idx
-  ON public.retros(person_id, week_number, year)
-  WHERE person_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS retros_person_week_year_idx
+      ON public.retros(person_id, week_number, year)
+      WHERE person_id IS NOT NULL;
+  END IF;
+END $$;
 
 -- ── Feature 2: Pending approval workflow ─────────────────────────────────────
 
 -- Add require_approval toggle to org_settings
-ALTER TABLE public.org_settings
-  ADD COLUMN IF NOT EXISTS require_approval boolean NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'org_settings'
+  ) THEN
+    ALTER TABLE public.org_settings
+      ADD COLUMN IF NOT EXISTS require_approval boolean NOT NULL DEFAULT false;
+  END IF;
+END $$;
 
 -- Add awaiting_approval status to profiles
 DO $$ BEGIN

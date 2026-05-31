@@ -28,46 +28,72 @@ BEGIN
   END IF;
 END $$;
 
--- Remap objective level_id values to the matching levels row
-UPDATE public.objectives o
-SET level_id = l.id
-FROM public.org_levels ol
-JOIN public.levels l
-  ON l.name    = ol.name
- AND (l.org_id = ol.org_id OR (l.org_id IS NULL AND ol.org_id IS NULL))
-WHERE o.level_id = ol.id
-  AND o.level_id IS NOT NULL;
+-- Remap objective level_id values to the matching levels row (only if org_levels exists)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'org_levels'
+  ) THEN
+    UPDATE public.objectives o
+    SET level_id = l.id
+    FROM public.org_levels ol
+    JOIN public.levels l
+      ON l.name    = ol.name
+     AND (l.org_id = ol.org_id OR (l.org_id IS NULL AND ol.org_id IS NULL))
+    WHERE o.level_id = ol.id
+      AND o.level_id IS NOT NULL;
+  END IF;
+END $$;
 
--- Add new FK to levels
-ALTER TABLE public.objectives
-  ADD CONSTRAINT objectives_level_id_fkey
-  FOREIGN KEY (level_id) REFERENCES public.levels(id) ON DELETE SET NULL;
+-- Add new FK to levels (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'objectives' AND constraint_name = 'objectives_level_id_fkey'
+      AND constraint_type = 'FOREIGN KEY'
+  ) THEN
+    ALTER TABLE public.objectives
+      ADD CONSTRAINT objectives_level_id_fkey
+      FOREIGN KEY (level_id) REFERENCES public.levels(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- ── STEP 3: Migrate teams.level_id from org_levels → levels ──────────────────
+-- Only applies if teams.level_id column exists (it may not in all environments)
 
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE table_name = 'teams'
-      AND constraint_name = 'teams_level_id_fkey'
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'teams' AND column_name = 'level_id'
   ) THEN
-    ALTER TABLE public.teams DROP CONSTRAINT teams_level_id_fkey;
+    -- Drop existing FK if present
+    IF EXISTS (
+      SELECT 1 FROM information_schema.table_constraints
+      WHERE table_name = 'teams'
+        AND constraint_name = 'teams_level_id_fkey'
+    ) THEN
+      ALTER TABLE public.teams DROP CONSTRAINT teams_level_id_fkey;
+    END IF;
+
+    -- Remap to levels IDs
+    UPDATE public.teams t
+    SET level_id = l.id
+    FROM public.org_levels ol
+    JOIN public.levels l
+      ON l.name    = ol.name
+     AND (l.org_id = ol.org_id OR (l.org_id IS NULL AND ol.org_id IS NULL))
+    WHERE t.level_id = ol.id
+      AND t.level_id IS NOT NULL;
+
+    -- Add new FK
+    ALTER TABLE public.teams
+      ADD CONSTRAINT teams_level_id_fkey
+      FOREIGN KEY (level_id) REFERENCES public.levels(id) ON DELETE SET NULL;
   END IF;
 END $$;
-
-UPDATE public.teams t
-SET level_id = l.id
-FROM public.org_levels ol
-JOIN public.levels l
-  ON l.name    = ol.name
- AND (l.org_id = ol.org_id OR (l.org_id IS NULL AND ol.org_id IS NULL))
-WHERE t.level_id = ol.id
-  AND t.level_id IS NOT NULL;
-
-ALTER TABLE public.teams
-  ADD CONSTRAINT teams_level_id_fkey
-  FOREIGN KEY (level_id) REFERENCES public.levels(id) ON DELETE SET NULL;
 
 -- ── STEP 4: Drop org_levels triggers, policies, then the table ───────────────
 
