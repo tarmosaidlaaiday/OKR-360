@@ -11,7 +11,7 @@ import { PageHeader } from '../components/cadence/PageHeader'
 import type { Level, Unit, OrgSettings } from '../types/cadence'
 
 export function OrgStructurePage() {
-  const { levels: ctxLevels, units: ctxUnits, settings: ctxSettings, refresh } = useOrg()
+  const { levels: ctxLevels, units: ctxUnits, settings: ctxSettings, org, refresh } = useOrg()
 
   // Local draft state — what the user is editing
   const [draftLevels, setDraftLevels]     = useState<Level[]>(ctxLevels)
@@ -54,7 +54,7 @@ export function OrgStructurePage() {
 
       if (existingUnits.length) await saveUnits(existingUnits)
       for (const u of newUnits) {
-        await createUnit({ name: u.name, level_id: u.level_id, parent_id: u.parent_id, position: u.position })
+        await createUnit({ name: u.name, level_id: u.level_id, parent_id: u.parent_id, position: u.position, org_id: org?.id })
       }
 
       // Settings

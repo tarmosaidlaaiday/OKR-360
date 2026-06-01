@@ -77,9 +77,10 @@ export async function createCycle(input: {
   start_date: string; end_date: string; review_closes_at?: string
 }): Promise<FullCycle> {
   const { data: { user } } = await supabase.auth.getUser()
+  const { data: orgId } = await supabase.rpc('my_org_id')
   const { data, error } = await supabase
     .from('cycles')
-    .insert({ ...input, status: 'draft', created_by: user?.id ?? null })
+    .insert({ ...input, status: 'draft', created_by: user?.id ?? null, org_id: orgId })
     .select('id, label, year, quarter, start_date, end_date, status, review_open_at, review_closes_at, created_by')
     .single()
   if (error) throw error

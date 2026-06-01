@@ -15,6 +15,7 @@ export interface Level {
   color: string
   position: number  // 0 = top of hierarchy
   enabled: boolean
+  org_id?: string
 }
 
 // Org unit (units table) — real named entities in the chart
@@ -24,11 +25,13 @@ export interface Unit {
   level_id: string | null
   parent_id: string | null
   position: number
+  org_id?: string
 }
 
 // Cascade behaviour flags (org_settings table)
 export interface OrgSettings {
   id?: string
+  org_id?: string
   require_parent_link: boolean
   allow_cross_level: boolean
   individual_level_enabled: boolean

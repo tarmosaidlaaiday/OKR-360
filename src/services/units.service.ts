@@ -4,7 +4,7 @@ import type { Unit, Level } from '../types/cadence'
 export async function getUnits(): Promise<Unit[]> {
   const { data, error } = await supabase
     .from('units')
-    .select('id, name, level_id, parent_id, position')
+    .select('id, name, level_id, parent_id, position, org_id')
     .order('position', { ascending: true })
   if (error) throw error
   return (data ?? []) as Unit[]

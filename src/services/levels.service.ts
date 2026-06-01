@@ -4,7 +4,7 @@ import type { Level } from '../types/cadence'
 export async function getLevels(): Promise<Level[]> {
   const { data, error } = await supabase
     .from('levels')
-    .select('id, name, color, position, enabled')
+    .select('id, name, color, position, enabled, org_id')
     .order('position', { ascending: true })
   if (error) throw error
   return (data ?? []) as Level[]
