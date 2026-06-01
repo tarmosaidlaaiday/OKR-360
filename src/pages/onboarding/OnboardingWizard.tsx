@@ -286,9 +286,16 @@ export function OnboardingWizard() {
     setLoading(true)
     setError('')
     try {
-      const { data: org, error: orgErr } = await supabase
+      // Pre-generate the org ID so we never need to SELECT back the
+      // just-inserted row. The org_select policy uses my_org_id(), which
+      // returns NULL until the profile UPDATE below runs — so chaining
+      // .select().single() on the insert would be blocked by RLS.
+      const newOrgId = crypto.randomUUID()
+
+      const { error: orgErr } = await supabase
         .from('organisations')
         .insert({
+          id: newOrgId,
           name: orgDraft.name.trim(),
           slug: slugify(orgDraft.name.trim()),
           industry: orgDraft.industry || null,
@@ -296,19 +303,17 @@ export function OnboardingWizard() {
           plan: 'trial',
           created_by: user.id,
         })
-        .select()
-        .single()
 
-      if (orgErr) throw new Error(orgErr.message)
+      if (orgErr) throw new Error(`Org insert: ${orgErr.message}`)
 
       const { error: profErr } = await supabase
         .from('profiles')
-        .update({ org_id: org.id, is_global_admin: true })
+        .update({ org_id: newOrgId, is_global_admin: true })
         .eq('id', user.id)
 
-      if (profErr) throw new Error(profErr.message)
+      if (profErr) throw new Error(`Profile update: ${profErr.message}`)
 
-      setOrgId(org.id)
+      setOrgId(newOrgId)
       await refreshProfile()
       setStep('structure')
     } catch (e) {
@@ -338,7 +343,7 @@ export function OnboardingWizard() {
           person_id: user!.id,
           type: 'invite_pending',
           title: `Invitation queued for ${email}`,
-          metadata: { invite_email: email, org_id: orgId },
+          body: `Pending invite for ${email} in org ${orgId}`,
         })
       ))
     }
