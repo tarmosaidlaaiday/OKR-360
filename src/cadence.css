@@ -1550,7 +1550,32 @@ kbd.cd-kbd {
   font-size: 18px;
   letter-spacing: -0.02em;
   margin-bottom: 16px;
+  color: inherit;
+  text-decoration: none;
 }
+.cd-auth-back {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+.cd-auth-back:hover { color: var(--ink-mid); }
+.cd-onboard-cancel {
+  display: block;
+  margin: 12px auto 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+.cd-onboard-cancel:hover { color: var(--ink-mid); }
 .cd-auth-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .cd-auth-sub { font-size: 13px; color: var(--ink-faint); margin: 4px 0 20px; }
 .cd-auth-form { display: flex; flex-direction: column; gap: 14px; }

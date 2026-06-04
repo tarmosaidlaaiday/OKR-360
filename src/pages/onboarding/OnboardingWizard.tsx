@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
@@ -390,13 +390,18 @@ export function OnboardingWizard() {
     navigate('/dashboard')
   }
 
+  async function handleCancel() {
+    await supabase.auth.signOut()
+    navigate('/')
+  }
+
   return (
     <div className="cd-auth-screen">
       <div className="cd-onboard-card">
-        <div className="cd-auth-brand" style={{ marginBottom: 4 }}>
+        <Link to="/" className="cd-auth-brand" style={{ marginBottom: 4 }}>
           <Icon name="sparkle" size={24} />
           <span className="cd-auth-brand-name" style={{ fontSize: 16 }}>OKR 360</span>
-        </div>
+        </Link>
 
         {step !== 'choice' && <ProgressDots step={step} />}
 
@@ -422,6 +427,17 @@ export function OnboardingWizard() {
             onChoiceSample={handleChoiceSample}
             onChoiceScratch={handleChoiceScratch}
           />
+        )}
+
+        {/* Only show cancel on the first step — org not yet created */}
+        {step === 'org' && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="cd-onboard-cancel"
+          >
+            Cancel setup
+          </button>
         )}
       </div>
     </div>

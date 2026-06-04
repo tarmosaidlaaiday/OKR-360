@@ -42,11 +42,12 @@ export function RegisterPage() {
 
   return (
     <div className="cd-auth-screen">
+      <Link to="/" className="cd-auth-back">← Back to home</Link>
       <div className="cd-auth-card">
-        <div className="cd-auth-brand">
+        <Link to="/" className="cd-auth-brand">
           <Icon name="sparkle" size={28} />
           <span className="cd-auth-brand-name">OKR 360</span>
-        </div>
+        </Link>
         <h1 className="cd-auth-title">Create your account</h1>
         <p className="cd-auth-sub">Start your 14-day free trial — no credit card needed</p>
 

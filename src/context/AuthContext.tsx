@@ -47,9 +47,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(sess)
       setUser(sess?.user ?? null)
       if (sess?.user) {
-        loadProfile(sess.user.id)
+        // Keep loading=true until profile arrives so ProtectedRoute never
+        // sees session=set + profile=null + loading=false (which triggers
+        // a spurious redirect to /onboarding for existing users).
+        setLoading(true)
+        loadProfile(sess.user.id).finally(() => setLoading(false))
       } else {
         setProfile(null)
+        setLoading(false)
       }
     })
 

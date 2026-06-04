@@ -27,11 +27,12 @@ export function LoginPage() {
 
   return (
     <div className="cd-auth-screen">
+      <Link to="/" className="cd-auth-back">← Back to home</Link>
       <div className="cd-auth-card">
-        <div className="cd-auth-brand">
+        <Link to="/" className="cd-auth-brand">
           <Icon name="sparkle" size={28} />
           <span className="cd-auth-brand-name">OKR 360</span>
-        </div>
+        </Link>
         <h1 className="cd-auth-title">Welcome back</h1>
         <p className="cd-auth-sub">Sign in to your workspace</p>
 
