@@ -35,8 +35,13 @@ export function OrgStructurePage() {
     setSaving(true)
     setError(null)
     try {
-      // Levels — upsert and delete removed ones
-      await saveLevels(draftLevels)
+      // Levels — only upsert levels with real DB UUIDs. Fallback levels
+      // (ids like 'group', 'company') are placeholders used when an org has
+      // no levels yet; upserting them would fail Postgres UUID type checking.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const realLevels = draftLevels.filter(l => UUID_RE.test(l.id))
+      if (realLevels.length) await saveLevels(realLevels)
+
       const removedLevelIds = ctxLevels
         .filter(l => !draftLevels.find(dl => dl.id === l.id))
         .map(l => l.id)
@@ -54,7 +59,9 @@ export function OrgStructurePage() {
 
       if (existingUnits.length) await saveUnits(existingUnits)
       for (const u of newUnits) {
-        await createUnit({ name: u.name, level_id: u.level_id, parent_id: u.parent_id, position: u.position, org_id: org?.id })
+        // Nullify any fallback level_id (non-UUID) to avoid FK type errors
+        const levelId = UUID_RE.test(u.level_id ?? '') ? u.level_id : null
+        await createUnit({ name: u.name, level_id: levelId, parent_id: u.parent_id, position: u.position, org_id: org?.id })
       }
 
       // Settings
