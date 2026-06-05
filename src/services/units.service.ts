@@ -27,9 +27,14 @@ export async function deleteUnit(id: string): Promise<void> {
 }
 
 export async function createUnit(unit: Omit<Unit, 'id'>): Promise<Unit> {
+  let orgId = unit.org_id
+  if (!orgId) {
+    const { data: rpcData } = await supabase.rpc('my_org_id')
+    orgId = rpcData as string
+  }
   const { data, error } = await supabase
     .from('units')
-    .insert(unit)
+    .insert({ ...unit, org_id: orgId })
     .select()
     .single()
   if (error) {
