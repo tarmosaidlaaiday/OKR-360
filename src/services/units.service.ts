@@ -1,11 +1,15 @@
 import { supabase } from '../lib/supabase'
 import type { Unit, Level } from '../types/cadence'
 
-export async function getUnits(): Promise<Unit[]> {
-  const { data, error } = await supabase
+export async function getUnits(orgId?: string | null): Promise<Unit[]> {
+  let q = supabase
     .from('units')
     .select('id, name, level_id, parent_id, position, org_id')
     .order('position', { ascending: true })
+  // Filter explicitly when orgId is known — don't rely solely on RLS
+  if (orgId) q = q.eq('org_id', orgId)
+  const { data, error } = await q
+  console.log('[getUnits] orgId:', orgId, 'rows:', data?.length, 'error:', error?.message)
   if (error) throw error
   return (data ?? []) as Unit[]
 }

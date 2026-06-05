@@ -61,12 +61,14 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         ).then(r => (r as any).data as Organisation | null).catch(() => null)
       : Promise.resolve(null)
 
+    console.log('[OrgContext] loading, orgId from auth:', orgId)
     Promise.all([
       getLevels().catch(() => [] as Level[]),
-      getUnits().catch(() => []),
+      getUnits(orgId).catch(() => []),
       getOrgSettings().catch(() => FALLBACK_SETTINGS),
       orgFetch,
     ]).then(([l, u, s, o]) => {
+      console.log('[OrgContext] loaded org:', o?.id, 'levels:', l.length, 'units:', u.length)
       // Only replace levels if we got real DB rows. Empty result keeps the
       // placeholder FALLBACK_LEVELS so the UI doesn't show a blank selector.
       if (l.length) setLevels(l)
