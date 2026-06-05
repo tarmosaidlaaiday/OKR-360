@@ -29,9 +29,12 @@ export async function deleteUnit(id: string): Promise<void> {
 export async function createUnit(unit: Omit<Unit, 'id'>): Promise<Unit> {
   let orgId = unit.org_id
   if (!orgId) {
-    const { data: rpcData } = await supabase.rpc('my_org_id')
-    orgId = rpcData as string
+    const { data: rpcData, error: rpcError } = await supabase.rpc('my_org_id')
+    if (rpcError) throw new Error(`my_org_id RPC failed: ${rpcError.message}`)
+    orgId = rpcData as string | null ?? undefined
   }
+  if (!orgId) throw new Error('Cannot create unit: org_id could not be resolved (profile may be missing org_id)')
+
   const { data, error } = await supabase
     .from('units')
     .insert({ ...unit, org_id: orgId })
@@ -39,13 +42,13 @@ export async function createUnit(unit: Omit<Unit, 'id'>): Promise<Unit> {
     .single()
   if (error) {
     console.error('[createUnit] failed', {
-      payload: unit,
+      payload: { ...unit, org_id: orgId },
       message: error.message,
       code: (error as any).code,
       details: (error as any).details,
       hint: (error as any).hint,
     })
-    throw new Error(error.message)
+    throw new Error(`Unit insert failed: ${error.message}`)
   }
   return data as Unit
 }
