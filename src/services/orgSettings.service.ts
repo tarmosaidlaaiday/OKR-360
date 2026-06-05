@@ -1,16 +1,21 @@
 import { supabase } from '../lib/supabase'
 import type { OrgSettings } from '../types/cadence'
 
+const DEFAULTS: OrgSettings = {
+  require_parent_link: false,
+  allow_cross_level: false,
+  individual_level_enabled: false,
+  show_alignment_gaps: true,
+}
+
 export async function getOrgSettings(): Promise<OrgSettings> {
-  const { data, error } = await supabase
+  // maybeSingle() returns null (not 406) when no row exists for this org yet
+  const { data } = await supabase
     .from('org_settings')
     .select('*')
-    .single()
-  if (error) {
-    // Table not yet migrated — return safe defaults
-    return { require_parent_link: false, allow_cross_level: false, individual_level_enabled: false, show_alignment_gaps: true }
-  }
-  return data as OrgSettings
+    .maybeSingle()
+
+  return (data as OrgSettings | null) ?? DEFAULTS
 }
 
 export async function saveOrgSettings(settings: Partial<OrgSettings> & { id?: string }): Promise<void> {

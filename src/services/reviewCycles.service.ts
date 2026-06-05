@@ -418,7 +418,7 @@ export async function getCycleSummary(cycleId: string): Promise<CycleSummary> {
     .eq('year', (cycle as any).year)
     .eq('quarter', (cycle as any).quarter - 1)
     .eq('status', 'archived')
-    .single()
+    .maybeSingle()
 
   let prevCycleScore: number | null = null
   if (prevCycles) {
