@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { supabase } from '../../lib/supabase'
@@ -35,7 +35,7 @@ function slugify(name: string): string {
   return name.toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 50) + '-' + Math.random().toString(36).slice(2, 6)
+    .slice(0, 50) + '-' + Date.now()
 }
 
 // ── Step components ────────────────────────────────────────────────────────
@@ -269,15 +269,33 @@ function ProgressDots({ step }: { step: Step }) {
 // ── Main wizard ────────────────────────────────────────────────────────────
 
 export function OnboardingWizard() {
-  const { user, orgId: existingOrgId, refreshProfile } = useAuth()
+  const { user, refreshProfile } = useAuth()
   const navigate = useNavigate()
 
-  // If user already has an org (e.g. re-visiting), skip to choice
-  const [step, setStep] = useState<Step>(existingOrgId ? 'choice' : 'org')
+  const [step, setStep] = useState<Step>('org')
   const [orgDraft, setOrgDraft] = useState<OrgDraft>({ name: '', industry: '', size: '' })
-  const [orgId, setOrgId] = useState<string | null>(existingOrgId)
-  const [loading, setLoading] = useState(false)
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)   // true until mount check completes
   const [error, setError] = useState('')
+
+  // On mount: read org_id fresh from DB (not from stale context) to decide
+  // whether to show the wizard or redirect to dashboard.
+  useEffect(() => {
+    if (!user) return
+    supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.org_id) {
+          // Already has an org — skip wizard entirely
+          setOrgId(data.org_id)
+          setStep('choice')
+        }
+        setLoading(false)
+      })
+  }, [user])
 
   // ── Step 1: create org + assign to profile ─────────────────────────────
 
