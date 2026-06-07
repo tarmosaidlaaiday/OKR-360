@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingWizard } from './pages/onboarding/OnboardingWizard'
 import { ProfileSetupPage } from './pages/onboarding/ProfileSetupPage'
@@ -48,9 +49,10 @@ export default function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path="/"          element={<LandingPage />} />
-                <Route path="/login"     element={<LoginPage />} />
-                <Route path="/signup"    element={<Navigate to="/register" replace />} />
-                <Route path="/register"  element={<RegisterPage />} />
+                <Route path="/login"          element={<LoginPage />} />
+                <Route path="/signup"         element={<Navigate to="/register" replace />} />
+                <Route path="/register"       element={<RegisterPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                 {/* Onboarding — requires auth but org not required */}
                 <Route element={<ProtectedRoute />}>

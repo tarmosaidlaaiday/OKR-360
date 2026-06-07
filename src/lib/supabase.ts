@@ -8,4 +8,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<any>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    detectSessionInUrl: true,
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})

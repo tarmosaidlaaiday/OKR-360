@@ -1582,6 +1582,7 @@ kbd.cd-kbd {
 .cd-auth-error { font-size: 13px; color: var(--bad); text-align: center; }
 .cd-auth-foot { font-size: 13px; color: var(--ink-mid); text-align: center; margin-top: 16px; }
 .cd-auth-foot a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.cd-link-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--accent); font-size: inherit; font-weight: 500; font-family: inherit; }
 .cd-field { display: flex; flex-direction: column; gap: 5px; }
 .cd-label { font-size: 12px; font-weight: 500; color: var(--ink-mid); }
 .cd-input {
