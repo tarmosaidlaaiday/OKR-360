@@ -313,6 +313,15 @@ export function OnboardingWizard() {
 
       if (profErr) throw new Error(`Profile update: ${profErr.message}`)
 
+      // Verify org_id actually saved — RLS on profiles UPDATE uses
+      // auth.uid() = id which should always pass, but confirm it stuck.
+      const { data: check } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single()
+      if (!check?.org_id) throw new Error('org_id still null after update — check profiles RLS UPDATE policy')
+
       setOrgId(newOrgId)
       await refreshProfile()
       setStep('structure')
