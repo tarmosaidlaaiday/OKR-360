@@ -1,0 +1,40 @@
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # Every Monday at 09:17 UTC — off-peak, avoids the :00/:30 thundering herd
+    - cron: '17 9 * * 1'
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          echo "Pinging Supabase at $(date -u)"
+
+          # Insert a keep-alive record into organisations (safe — uses the
+          # anon key so RLS applies; the insert goes to a real table to
+          # ensure the DB actually wakes up, not just the API layer).
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            "$SUPABASE_URL/rest/v1/organisations" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "{\"id\": \"$(cat /proc/sys/kernel/random/uuid)\", \"name\": \"_keepalive_$(date +%s)\", \"slug\": \"keepalive-$(date +%s)\", \"plan\": \"trial\"}")
+
+          echo "HTTP status: $RESPONSE"
+
+          # 201 = inserted, 409 = conflict (still alive), both are fine
+          if [ "$RESPONSE" = "201" ] || [ "$RESPONSE" = "409" ]; then
+            echo "Supabase is active"
+          else
+            echo "Unexpected response: $RESPONSE" >&2
+            exit 1
+          fi
