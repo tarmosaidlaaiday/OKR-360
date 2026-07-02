@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
     // Verify caller is global admin or unit admin
     const { data: callerProfile } = await supabaseAdmin
       .from('profiles')
-      .select('is_global_admin')
+      .select('is_global_admin, org_id')
       .eq('id', caller.id)
       .single()
 
@@ -60,6 +60,11 @@ Deno.serve(async (req: Request) => {
         throw new Error('Forbidden: admin privileges required')
       }
     }
+
+    // Caller must belong to an org — derive org_id from their profile rather
+    // than trusting payload.org_id, which would allow cross-tenant assignment.
+    const callerOrgId = callerProfile?.org_id
+    if (!callerOrgId) throw new Error('Forbidden: caller has no org assigned')
 
     const payload: CreatePayload = await req.json()
     const action = payload.action ?? 'create'
@@ -88,14 +93,14 @@ Deno.serve(async (req: Request) => {
 
     // ── Action: invite ────────────────────────────────────────────────────
     if (action === 'invite') {
-      const { email, unit_id, role = 'member', org_id } = payload
-      if (!email || !unit_id || !org_id) throw new Error('email, unit_id, and org_id are required')
+      const { email, unit_id, role = 'member' } = payload
+      if (!email || !unit_id) throw new Error('email and unit_id are required')
 
       // Fetch org name for personalised email subject/body
       const { data: orgRow } = await supabaseAdmin
         .from('organisations')
         .select('name')
-        .eq('id', org_id)
+        .eq('id', callerOrgId)
         .single()
       const orgName = orgRow?.name ?? 'your organisation'
 
@@ -111,11 +116,12 @@ Deno.serve(async (req: Request) => {
 
       const userId = inviteData.user.id
 
-      // Upsert profile with pending status + org assignment
+      // Upsert profile with pending status + org assignment.
+      // org_id is always taken from the caller's profile — never from payload.
       await supabaseAdmin.from('profiles').upsert({
         id: userId,
         email,
-        org_id,
+        org_id: callerOrgId,
         status: 'pending',
         must_change_password: false,
       }, { onConflict: 'id' })
@@ -126,12 +132,12 @@ Deno.serve(async (req: Request) => {
         unit_id,
         role,
         is_primary: true,
-        org_id,
+        org_id: callerOrgId,
       }).then(() => {}) // ignore conflict if already exists
 
       // Log to audit_log
       await supabaseAdmin.from('audit_log').insert({
-        org_id,
+        org_id: callerOrgId,
         actor_id: caller.id,
         action: 'user.invited',
         target_type: 'profile',
@@ -183,17 +189,13 @@ Deno.serve(async (req: Request) => {
         is_primary: true,
       })
 
-    // 4. Assign org from caller's profile
-    const { data: callerProf } = await supabaseAdmin
-      .from('profiles').select('org_id').eq('id', caller.id).single()
-    if (callerProf?.org_id) {
-      await supabaseAdmin.from('profiles')
-        .update({ org_id: callerProf.org_id })
-        .eq('id', userId)
-      await supabaseAdmin.from('people_units')
-        .update({ org_id: callerProf.org_id })
-        .eq('person_id', userId)
-    }
+    // 4. Assign org from caller's profile (callerOrgId already verified above)
+    await supabaseAdmin.from('profiles')
+      .update({ org_id: callerOrgId })
+      .eq('id', userId)
+    await supabaseAdmin.from('people_units')
+      .update({ org_id: callerOrgId })
+      .eq('person_id', userId)
 
     return new Response(
       JSON.stringify({ person_id: userId, success: true }),
