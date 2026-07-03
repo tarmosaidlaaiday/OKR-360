@@ -10,7 +10,7 @@ interface PageHeaderProps {
 export function PageHeader({ title, eyebrow, sub, actions }: PageHeaderProps) {
   return (
     <header className="cd-pgh">
-      <div>
+      <div className="cd-pgh-titlewrap">
         {eyebrow && <div className="cd-pgh-eyebrow">{eyebrow}</div>}
         <h1 className="cd-pgh-title">{title}</h1>
         {sub && <p className="cd-pgh-sub">{sub}</p>}

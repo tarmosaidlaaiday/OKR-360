@@ -3680,8 +3680,11 @@ kbd.cd-kbd {
   border-bottom-color: var(--accent);
   font-weight: 600;
 }
-/* Hide the PageHeader of inner pages when rendered inside a tab */
-.cd-tab-content .cd-pgh { display: none; }
+/* Hide only the duplicate title of inner pages when rendered inside a tab —
+   keep header actions (e.g. Save changes) visible, right-aligned. */
+.cd-tab-content .cd-pgh { justify-content: flex-end; padding-bottom: 0; }
+.cd-tab-content .cd-pgh-titlewrap { display: none; }
+.cd-tab-content .cd-pgh:not(:has(.cd-pg-act)) { display: none; }
 
 /* ─── Review banner ────────────────────────────────────────────────────── */
 .cd-review-banner {
