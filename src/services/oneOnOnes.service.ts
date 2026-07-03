@@ -200,6 +200,107 @@ export async function submitSession(
   } catch { /* best-effort */ }
 }
 
+// ── Update entry (past-session edits — no submitted_at, sets updated_at) ─────
+
+export async function updateSessionEntry(
+  oneOnOneId: string,
+  fields: Partial<OneOnOneEntry>,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from('one_on_one_entries')
+    .select('id')
+    .eq('one_on_one_id', oneOnOneId)
+    .single()
+
+  if (existing) {
+    await supabase
+      .from('one_on_one_entries')
+      .update({ ...fields, last_saved_at: new Date().toISOString() })
+      .eq('id', (existing as any).id)
+  } else {
+    await supabase
+      .from('one_on_one_entries')
+      .insert({ one_on_one_id: oneOnOneId, ...fields, last_saved_at: new Date().toISOString() })
+  }
+
+  // Track last edit time on the parent row
+  await supabase
+    .from('one_on_ones')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', oneOnOneId)
+}
+
+// ── Duplicate session ─────────────────────────────────────────────────────
+
+export async function duplicateSession(sourceOneOnOneId: string): Promise<string> {
+  // 1. Read source row
+  const { data: src, error: srcErr } = await supabase
+    .from('one_on_ones')
+    .select('manager_id, report_id')
+    .eq('id', sourceOneOnOneId)
+    .single()
+  if (srcErr) throw srcErr
+
+  // 2. Read source entry
+  const { data: entry } = await supabase
+    .from('one_on_one_entries')
+    .select('*')
+    .eq('one_on_one_id', sourceOneOnOneId)
+    .maybeSingle()
+
+  // 3. Pre-generate UUID — avoids RLS timing bugs with .insert().select().single()
+  const newId = crypto.randomUUID()
+
+  // 4. Insert new one_on_ones row
+  const { error: insErr } = await supabase
+    .from('one_on_ones')
+    .insert({
+      id: newId,
+      manager_id: (src as any).manager_id,
+      report_id: (src as any).report_id,
+      scheduled_at: new Date().toISOString(),
+      status: 'draft',
+      done: false,
+    })
+  if (insErr) throw insErr
+
+  // 5. Copy entry (reset happiness + submission fields)
+  const e = entry as any
+  await supabase.from('one_on_one_entries').insert({
+    one_on_one_id: newId,
+    work_wins:            e?.work_wins ?? null,
+    work_blockers:        e?.work_blockers ?? null,
+    work_needs_manager:   e?.work_needs_manager ?? null,
+    work_topics:          e?.work_topics ?? null,
+    feedback_for_report:  e?.feedback_for_report ?? null,
+    feedback_from_report: e?.feedback_from_report ?? null,
+    personal_highlight:   e?.personal_highlight ?? null,
+    professional_highlight: e?.professional_highlight ?? null,
+    personal_low:         e?.personal_low ?? null,
+    professional_low:     e?.professional_low ?? null,
+    // happiness, happiness_followup, submitted_at left null intentionally
+  })
+
+  return newId
+}
+
+// ── Delete session (entries cascade via FK) ────────────────────────────────
+
+export async function deleteSession(oneOnOneId: string): Promise<void> {
+  const { error } = await supabase.from('one_on_ones').delete().eq('id', oneOnOneId)
+  if (error) throw error
+}
+
+// ── Reschedule ────────────────────────────────────────────────────────────
+
+export async function updateSchedule(oneOnOneId: string, isoString: string): Promise<void> {
+  const { error } = await supabase
+    .from('one_on_ones')
+    .update({ scheduled_at: isoString })
+    .eq('id', oneOnOneId)
+  if (error) throw error
+}
+
 // ── Legacy helpers kept for backward compat ────────────────────────────────
 
 export async function getOneOnOnes(userId: string): Promise<OneOnOne[]> {
