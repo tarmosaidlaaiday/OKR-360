@@ -1218,7 +1218,69 @@ kbd.cd-kbd {
   cursor: pointer;
   color: inherit;
 }
-.cd-oo-hist:hover { background: var(--bg-sub); }
+.cd-oo-hist:hover { background: transparent; }
+
+/* History row wrapper — holds the clickable cd-oo-hist button + kebab button */
+.cd-oo-hist-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border-radius: var(--radius);
+}
+.cd-oo-hist-row .cd-oo-hist { flex: 1; min-width: 0; }
+.cd-oo-hist-row:hover { background: var(--bg-sub); }
+.cd-oo-hist-row.is-on {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+  border-left: 2.5px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding-left: 2px;
+}
+
+/* Kebab dropdown */
+.cd-oo-kebab { position: relative; flex-shrink: 0; padding-right: 4px; }
+.cd-oo-kebab-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 300;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  min-width: 130px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.cd-oo-kebab-item {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.cd-oo-kebab-item:hover { background: var(--bg-sub); }
+.cd-oo-kebab-danger { color: var(--bad) !important; }
+
+/* Past-session editing banner */
+.cd-oo-past-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px var(--d-pad-card);
+  background: color-mix(in oklab, var(--accent) 8%, var(--bg-elev));
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-mid);
+}
+.cd-oo-past-banner strong { color: var(--ink); }
+
 .cd-oo-hist-date {
   font-size: 10.5px;
   font-family: "Geist Mono", monospace;

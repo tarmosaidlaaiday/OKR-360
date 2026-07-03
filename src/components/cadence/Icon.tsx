@@ -5,7 +5,7 @@ type IconName =
   | 'flag' | 'sparkle' | 'calendar' | 'settings' | 'grid'
   | 'link' | 'x' | 'star' | 'users' | 'bell' | 'alertTriangle'
   | 'mail' | 'shield' | 'slash' | 'eye' | 'eyeOff' | 'checkCircle' | 'chartLine' | 'sitemap'
-  | 'history' | 'zap' | 'hourglass' | 'thumbsUp'
+  | 'history' | 'zap' | 'hourglass' | 'thumbsUp' | 'moreVertical'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard:  <><rect x="3" y="3"  width="7" height="9"  rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/></>,
@@ -48,6 +48,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   zap:           <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
   hourglass:     <><path d="M5 22h14M5 2h14M17 22v-4.2a5 5 0 0 0-1.46-3.54L12 11 8.46 14.26A5 5 0 0 0 7 17.8V22M17 2v4.2a5 5 0 0 1-1.46 3.54L12 13 8.46 9.74A5 5 0 0 1 7 6.2V2"/></>,
   thumbsUp:      <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></>,
+  moreVertical:  <><circle cx="12" cy="5"  r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/></>,
 }
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {

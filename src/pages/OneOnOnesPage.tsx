@@ -11,11 +11,22 @@ import { Icon } from '../components/cadence/Icon'
 import { confidenceColor } from '../lib/colors'
 import { happinessLabel } from '../lib/cadenceUtils'
 import { supabase } from '../lib/supabase'
-import { createDraftSession } from '../services/oneOnOnes.service'
+import {
+  createDraftSession, duplicateSession, deleteSession, updateSchedule,
+} from '../services/oneOnOnes.service'
 import { EmptyState } from '../components/cadence/EmptyState'
 import type { OneOnOneEntry, Person, CadenceObjective } from '../types/cadence'
 
-// ── Happiness track (header — shows last 4 values as ConfidenceCell row) ──
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function toDatetimeLocal(isoString: string | null | undefined): string {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// ── Happiness track ────────────────────────────────────────────────────────
 
 function HappinessTrackRow({ values }: { values: (number | null)[] }) {
   const last4 = values.filter(v => v != null).slice(-4) as number[]
@@ -27,7 +38,7 @@ function HappinessTrackRow({ values }: { values: (number | null)[] }) {
   )
 }
 
-// ── Field component with auto-save ────────────────────────────────────────
+// ── Field component ────────────────────────────────────────────────────────
 
 interface FieldProps {
   label: string
@@ -51,6 +62,65 @@ function Field({ label, placeholder, value, onChange, example, rows = 3 }: Field
       />
       {example && <span className="cd-field-eg">e.g. {example}</span>}
     </label>
+  )
+}
+
+// ── Kebab menu ────────────────────────────────────────────────────────────
+
+function KebabMenu({
+  onDuplicate, onDelete, disabled,
+}: { onDuplicate: () => void; onDelete: () => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    function handle(e: MouseEvent | KeyboardEvent) {
+      if (e instanceof KeyboardEvent) {
+        if (e.key === 'Escape') setOpen(false)
+      } else {
+        if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    document.addEventListener('keydown', handle)
+    return () => {
+      document.removeEventListener('mousedown', handle)
+      document.removeEventListener('keydown', handle)
+    }
+  }, [open])
+
+  return (
+    <div ref={wrapRef} className="cd-oo-kebab">
+      <button
+        type="button"
+        className="cd-btn-icon"
+        disabled={disabled}
+        onClick={e => { e.stopPropagation(); setOpen(v => !v) }}
+        style={{ width: 28, height: 28 }}
+        aria-label="More actions"
+      >
+        <Icon name="moreVertical" size={13} />
+      </button>
+      {open && (
+        <div className="cd-oo-kebab-menu">
+          <button
+            type="button"
+            className="cd-oo-kebab-item"
+            onClick={() => { setOpen(false); onDuplicate() }}
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            className="cd-oo-kebab-item cd-oo-kebab-danger"
+            onClick={() => { setOpen(false); onDelete() }}
+          >
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -266,14 +336,18 @@ export function OneOnOnesPage() {
   const { activeCycle } = useCycle()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const hook = useOneOnOnes()
   const {
     people, selectedId, setSelectedId,
     draft, past, loading, sessionsLoading,
-    saveEntry, submitDraft,
-  } = useOneOnOnes()
+    openSessionId, openSession,
+    selectSession,
+    saveEntry, updateSession, submitDraft, reload,
+  } = hook
 
   const [tab, setTab] = useState<TabId>('personal')
   const [localEntry, setLocalEntry] = useState<Partial<OneOnOneEntry>>({})
+  const [savedEntry, setSavedEntry] = useState<Partial<OneOnOneEntry>>({})  // snapshot for Cancel
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -283,6 +357,23 @@ export function OneOnOnesPage() {
   const [pickerSearch, setPickerSearch] = useState('')
   const [allPeople, setAllPeople] = useState<Person[]>([])
   const [pickerCreating, setPickerCreating] = useState(false)
+
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Reschedule modal
+  const [rescheduleOpen, setRescheduleOpen] = useState(false)
+  const [rescheduleValue, setRescheduleValue] = useState('')
+  const [rescheduling, setRescheduling] = useState(false)
+
+  const isViewingPast = openSession?.status === 'done'
+
+  // Refs so the debounced callback sees current values without going stale
+  const openSessionIdRef = useRef<string | null>(null)
+  const isViewingPastRef = useRef(false)
+  openSessionIdRef.current = openSessionId
+  isViewingPastRef.current = isViewingPast
 
   // Load all people on mount (needed for picker)
   useEffect(() => {
@@ -311,7 +402,7 @@ export function OneOnOnesPage() {
     try {
       await createDraftSession(user.id, person.id)
     } catch {
-      // Session might already exist — that's fine
+      // Session might already exist — fine
     } finally {
       setPickerCreating(false)
     }
@@ -322,30 +413,92 @@ export function OneOnOnesPage() {
   }
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const selectedPerson = people.find(p => p.id === selectedId) ?? null
 
-  // Sync local entry from draft when draft changes
+  // Sync local entry whenever the open session changes
   useEffect(() => {
-    if (draft?.entry) setLocalEntry({ ...draft.entry })
-    else setLocalEntry({})
-  }, [draft?.id])
+    const entry = openSession?.entry ? { ...openSession.entry } : {}
+    setLocalEntry(entry)
+    setSavedEntry(entry)
+    setLastSaved(null)
+  }, [openSessionId]) // intentionally depend on id, not the object
 
-  // Debounced auto-save
+  // Debounced auto-save — works for both draft and past sessions
   const handleEntryChange = useCallback((fields: Partial<OneOnOneEntry>) => {
     setLocalEntry(prev => ({ ...prev, ...fields }))
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
-      if (!draft?.id) return
-      await saveEntry(draft.id, fields)
+      const id = openSessionIdRef.current
+      const isPast = isViewingPastRef.current
+      if (!id) return
+      if (isPast) {
+        await updateSession(id, fields)
+      } else {
+        await saveEntry(id, fields)
+      }
       setLastSaved(new Date())
     }, 800)
-  }, [draft?.id, saveEntry])
+  }, [saveEntry, updateSession])
 
   async function handleSubmit() {
     if (!draft) return
     setSubmitting(true)
     try { await submitDraft() } finally { setSubmitting(false) }
+  }
+
+  async function handleSavePast() {
+    if (!openSessionId) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    await updateSession(openSessionId, localEntry)
+    setSavedEntry({ ...localEntry })
+    setLastSaved(new Date())
+  }
+
+  function handleCancelPast() {
+    setLocalEntry({ ...savedEntry })
+  }
+
+  async function handleDuplicate(sessionId: string) {
+    try {
+      const newId = await duplicateSession(sessionId)
+      await reload()
+      selectSession(newId)
+    } catch (e) {
+      console.error('[duplicate 1:1]', e)
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const wasOpen = deleteTarget === openSessionId
+    try {
+      if (wasOpen) {
+        // Reset so loadSessions will re-initialize to the draft
+        selectSession(null)
+      }
+      await deleteSession(deleteTarget)
+      setDeleteTarget(null)
+      await reload()
+    } catch (e) {
+      console.error('[delete 1:1]', e)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleReschedule() {
+    if (!draft?.id || !rescheduleValue) return
+    setRescheduling(true)
+    try {
+      await updateSchedule(draft.id, new Date(rescheduleValue).toISOString())
+      setRescheduleOpen(false)
+      await reload()
+    } catch (e) {
+      console.error('[reschedule 1:1]', e)
+    } finally {
+      setRescheduling(false)
+    }
   }
 
   const pastHappiness = past
@@ -364,10 +517,20 @@ export function OneOnOnesPage() {
           <p className="cd-pgh-sub">A shared prep doc, last meeting's notes one click away, and a happiness trend you can actually feel.</p>
         </div>
         <div className="cd-pg-act">
-          <button type="button" className="cd-btn cd-btn-secondary">
-            <Icon name="calendar" size={14} /> Reschedule
-          </button>
-          {draft && (
+          {!isViewingPast && (
+            <button
+              type="button"
+              className="cd-btn cd-btn-secondary"
+              disabled={!draft || !openSession || isViewingPast}
+              onClick={() => {
+                setRescheduleValue(toDatetimeLocal(draft?.scheduled_at))
+                setRescheduleOpen(true)
+              }}
+            >
+              <Icon name="calendar" size={14} /> Reschedule
+            </button>
+          )}
+          {!isViewingPast && draft && (
             <button
               type="button"
               className="cd-btn cd-btn-primary"
@@ -404,24 +567,60 @@ export function OneOnOnesPage() {
               <div className="cd-oo-side-hd cd-oo-side-hd-2">
                 History · {selectedPerson.name.split(' ')[0]}
               </div>
+              {/* Draft row in history */}
+              {draft && (
+                <div className={'cd-oo-hist-row ' + (openSessionId === draft.id ? 'is-on' : '')}>
+                  <button
+                    type="button"
+                    className="cd-oo-hist"
+                    onClick={() => selectSession(draft.id)}
+                  >
+                    <div className="cd-oo-hist-date">
+                      {draft.scheduled_at
+                        ? new Date(draft.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                        : '—'}
+                      {' · '}
+                      <span style={{ color: 'var(--accent)', fontWeight: 500 }}>Draft</span>
+                    </div>
+                    <div className="cd-oo-hist-text">
+                      <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>In progress</span>
+                    </div>
+                  </button>
+                  <KebabMenu
+                    onDuplicate={() => handleDuplicate(draft.id)}
+                    onDelete={() => setDeleteTarget(draft.id)}
+                    disabled={submitting}
+                  />
+                </div>
+              )}
               {sessionsLoading && <p className="cd-loading" style={{ padding: '8px 14px', fontSize: 12 }}>Loading…</p>}
               {past.map(m => (
-                <button key={m.id} type="button" className="cd-oo-hist">
-                  <div className="cd-oo-hist-date">
-                    {m.scheduled_at
-                      ? new Date(m.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                      : '—'}
-                  </div>
-                  <div className="cd-oo-hist-text">
-                    <ConfidenceCell value={m.entry?.happiness ?? m.happiness ?? null} size={18} />
-                    <span>
-                      {m.summary?.slice(0, 70) ?? ''}
-                      {m.summary && m.summary.length > 70 ? '…' : ''}
-                    </span>
-                  </div>
-                </button>
+                <div key={m.id} className={'cd-oo-hist-row ' + (openSessionId === m.id ? 'is-on' : '')}>
+                  <button
+                    type="button"
+                    className="cd-oo-hist"
+                    onClick={() => selectSession(m.id)}
+                  >
+                    <div className="cd-oo-hist-date">
+                      {m.scheduled_at
+                        ? new Date(m.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                        : '—'}
+                    </div>
+                    <div className="cd-oo-hist-text">
+                      <ConfidenceCell value={m.entry?.happiness ?? m.happiness ?? null} size={18} />
+                      <span>
+                        {m.summary?.slice(0, 70) ?? ''}
+                        {m.summary && m.summary.length > 70 ? '…' : ''}
+                      </span>
+                    </div>
+                  </button>
+                  <KebabMenu
+                    onDuplicate={() => handleDuplicate(m.id)}
+                    onDelete={() => setDeleteTarget(m.id)}
+                  />
+                </div>
               ))}
-              {!sessionsLoading && past.length === 0 && (
+              {!sessionsLoading && past.length === 0 && !draft && (
                 <p className="cd-empty-hint" style={{ padding: '8px 14px', fontSize: 12 }}>No past sessions yet.</p>
               )}
             </>
@@ -440,6 +639,27 @@ export function OneOnOnesPage() {
         <main className="cd-oo-main">
           {selectedPerson ? (
             <div className="cd-card" style={{ padding: 0 }}>
+              {/* Editing-past banner */}
+              {isViewingPast && (
+                <div className="cd-oo-past-banner">
+                  <span>
+                    Editing past 1:1 from{' '}
+                    <strong>
+                      {openSession?.scheduled_at
+                        ? new Date(openSession.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                        : '—'}
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    className="cd-btn cd-btn-ghost cd-btn-sm"
+                    onClick={() => selectSession(draft?.id ?? null)}
+                  >
+                    ← Back to current draft
+                  </button>
+                </div>
+              )}
+
               {/* Meeting header */}
               <div className="cd-oo-mhd">
                 <div className="cd-oo-mhd-l">
@@ -448,8 +668,8 @@ export function OneOnOnesPage() {
                     <div className="cd-oo-mhd-name">{selectedPerson.name}</div>
                     <div className="cd-oo-mhd-meta">
                       <Icon name="calendar" size={12} />
-                      {draft?.scheduled_at
-                        ? new Date(draft.scheduled_at).toLocaleDateString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' })
+                      {(openSession ?? draft)?.scheduled_at
+                        ? new Date((openSession ?? draft)!.scheduled_at!).toLocaleDateString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' })
                         : 'No session scheduled'}
                     </div>
                   </div>
@@ -511,23 +731,42 @@ export function OneOnOnesPage() {
                 <div className="cd-oo-foot-status">
                   <Icon name="check" size={13} />
                   {lastSaved
-                    ? `Draft auto-saved · ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                    : 'Draft auto-saved · just now'}
+                    ? `Auto-saved · ${lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Auto-saved · just now'}
                 </div>
-                <div className="cd-oo-foot-act">
-                  <button type="button" className="cd-btn cd-btn-ghost">Discard draft</button>
-                  <button type="button" className="cd-btn cd-btn-secondary">
-                    Share with {selectedPerson.name.split(' ')[0]}
-                  </button>
-                  <button
-                    type="button"
-                    className="cd-btn cd-btn-primary"
-                    disabled={!draft || submitting}
-                    onClick={handleSubmit}
-                  >
-                    {submitting ? 'Submitting…' : 'Submit prep'}
-                  </button>
-                </div>
+                {isViewingPast ? (
+                  <div className="cd-oo-foot-act">
+                    <button
+                      type="button"
+                      className="cd-btn cd-btn-ghost"
+                      onClick={handleCancelPast}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="cd-btn cd-btn-primary"
+                      onClick={handleSavePast}
+                    >
+                      Save changes
+                    </button>
+                  </div>
+                ) : (
+                  <div className="cd-oo-foot-act">
+                    <button type="button" className="cd-btn cd-btn-ghost">Discard draft</button>
+                    <button type="button" className="cd-btn cd-btn-secondary">
+                      Share with {selectedPerson.name.split(' ')[0]}
+                    </button>
+                    <button
+                      type="button"
+                      className="cd-btn cd-btn-primary"
+                      disabled={!draft || submitting}
+                      onClick={handleSubmit}
+                    >
+                      {submitting ? 'Submitting…' : 'Submit prep'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -538,6 +777,99 @@ export function OneOnOnesPage() {
           )}
         </main>
       </div>
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div
+          className="cd-modal-backdrop"
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div className="cd-modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+            <div className="cd-modal-hd">
+              <span className="cd-modal-title">Delete this 1:1 memo?</span>
+              <button
+                type="button"
+                className="cd-btn-icon"
+                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
+              >
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+            <div className="cd-modal-body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-mid)' }}>
+                This can't be undone. All notes and entries for this session will be permanently deleted.
+              </p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn-ghost"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn-danger"
+                  disabled={deleting}
+                  onClick={handleDeleteConfirm}
+                >
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reschedule modal */}
+      {rescheduleOpen && (
+        <div
+          className="cd-modal-backdrop"
+          onClick={() => !rescheduling && setRescheduleOpen(false)}
+        >
+          <div className="cd-modal" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div className="cd-modal-hd">
+              <span className="cd-modal-title">Reschedule 1:1</span>
+              <button
+                type="button"
+                className="cd-btn-icon"
+                disabled={rescheduling}
+                onClick={() => setRescheduleOpen(false)}
+              >
+                <Icon name="x" size={15} />
+              </button>
+            </div>
+            <div className="cd-modal-body" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <input
+                type="datetime-local"
+                className="cd-um-input"
+                value={rescheduleValue}
+                onChange={e => setRescheduleValue(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn-ghost"
+                  disabled={rescheduling}
+                  onClick={() => setRescheduleOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn-primary"
+                  disabled={rescheduling || !rescheduleValue}
+                  onClick={handleReschedule}
+                >
+                  {rescheduling ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New 1:1 person picker */}
       {pickerOpen && (
