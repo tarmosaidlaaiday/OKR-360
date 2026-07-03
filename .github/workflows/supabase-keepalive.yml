@@ -17,22 +17,17 @@ jobs:
         run: |
           echo "Pinging Supabase at $(date -u)"
 
-          # Insert a keep-alive record into organisations (safe — uses the
-          # anon key so RLS applies; the insert goes to a real table to
-          # ensure the DB actually wakes up, not just the API layer).
+          # Read-only GET ping — fetches one org row to wake the DB without
+          # writing anything. Avoids the permissive INSERT policy entirely.
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X POST \
-            "$SUPABASE_URL/rest/v1/organisations" \
+            -X GET \
+            "$SUPABASE_URL/rest/v1/organisations?select=id&limit=1" \
             -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d "{\"id\": \"$(cat /proc/sys/kernel/random/uuid)\", \"name\": \"_keepalive_$(date +%s)\", \"slug\": \"keepalive-$(date +%s)\", \"plan\": \"trial\"}")
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
 
           echo "HTTP status: $RESPONSE"
 
-          # 201 = inserted, 409 = conflict (still alive), both are fine
-          if [ "$RESPONSE" = "201" ] || [ "$RESPONSE" = "409" ]; then
+          if [ "$RESPONSE" = "200" ]; then
             echo "Supabase is active"
           else
             echo "Unexpected response: $RESPONSE" >&2
