@@ -15,12 +15,19 @@ export async function getUnits(orgId?: string | null): Promise<Unit[]> {
 }
 
 export async function saveUnits(units: Unit[]): Promise<void> {
-  const { error } = await supabase
+  if (units.length === 0) return
+  // .select() ensures we get back rows actually written — a silent RLS block
+  // returns 0 rows with no error, which we surface as an explicit failure.
+  const { data, error } = await supabase
     .from('units')
     .upsert(units.map((u, i) => ({ ...u, position: i })))
+    .select('id')
   if (error) {
     console.error('[saveUnits] failed', { message: error.message, code: (error as any).code, hint: (error as any).hint })
-    throw new Error(error.message)
+    throw new Error(`Save units failed: ${error.message}`)
+  }
+  if ((data?.length ?? 0) < units.length) {
+    throw new Error(`Save units: only ${data?.length ?? 0} of ${units.length} rows saved — RLS may be blocking the update`)
   }
 }
 
