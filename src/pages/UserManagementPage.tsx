@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { usePageActionStore } from '../stores/pageActionStore'
 import { useUserManagement } from '../hooks/useUserManagement'
 import { useOrg } from '../context/OrgContext'
@@ -160,7 +161,7 @@ function CreateUserForm({
       await onInvite({ email: form.email, unit_id: form.unit_id, role: form.role, org_id: orgId })
       setSuccess(`Invitation sent to ${form.email}. They'll receive a magic-link to set up their account.`)
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : 'Failed to send invitation')
+      setErr(getErrorMessage(ex))
       setSubmitting(false)
     }
   }
@@ -178,7 +179,7 @@ function CreateUserForm({
       await onCreate(form)
       setSuccess(`Account created for ${form.name}. They can sign in with ${form.email} and the password you set.`)
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : 'Failed to create user')
+      setErr(getErrorMessage(ex))
       setSubmitting(false)
     }
   }
@@ -302,7 +303,7 @@ function ResetPasswordForm({
       await onReset(pw)
       setSuccess(true)
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : 'Reset failed')
+      setErr(getErrorMessage(ex))
     } finally {
       setSaving(false)
     }

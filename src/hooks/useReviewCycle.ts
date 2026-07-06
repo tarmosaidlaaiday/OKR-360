@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -53,7 +54,7 @@ export function useReviewCycle() {
       items.forEach(obj => d.set(obj.id, defaultDraft(obj)))
       setDrafts(d)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load review items')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }
@@ -105,7 +106,7 @@ export function useReviewCycle() {
       await submitSelfAssessment(input)
       await reload()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submission failed')
+      setError(getErrorMessage(e))
       throw e
     } finally {
       setIsSubmitting(false)

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Select } from '../ui/Select'
@@ -42,7 +43,7 @@ export function KeyResultForm({ open, onClose, objectiveId, onSubmit }: KeyResul
       onClose()
       setTitle(''); setTargetType('numeric'); setTargetValue('100'); setUnit('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }

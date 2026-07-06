@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { supabase } from '../../lib/supabase'
@@ -298,7 +299,7 @@ export function OnboardingWizard() {
       await refreshProfile()
       setStep('invite')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create organisation')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }
@@ -349,7 +350,7 @@ export function OnboardingWizard() {
 
       navigate('/dashboard')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to generate sample data')
+      setError(getErrorMessage(e))
       setLoading(false)
     }
   }

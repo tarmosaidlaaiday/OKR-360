@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { useAuth } from '../../context/AuthContext'
@@ -41,7 +42,7 @@ export function LoginPage() {
       if (resetError) throw resetError
       setResetSent(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send reset email')
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

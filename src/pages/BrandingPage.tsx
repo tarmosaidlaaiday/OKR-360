@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useOrg } from '../context/OrgContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -75,7 +76,7 @@ export function BrandingPage() {
       await updateOrg({ logo_url: data.publicUrl })
       flashSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed')
+      setError(getErrorMessage(e))
     } finally {
       setUploading(false)
     }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Modal } from '../ui/Modal'
 import { Input } from '../ui/Input'
 import { Textarea } from '../ui/Input'
@@ -32,7 +33,7 @@ export function CheckinForm({ open, onClose, keyResult, onSubmit }: CheckinFormP
       onClose()
       setNotes('')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }

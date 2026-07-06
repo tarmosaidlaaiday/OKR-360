@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
@@ -135,7 +136,7 @@ export function SecurityPage() {
       setSuccess(true)
       setTimeout(() => navigate('/dashboard'), 1500)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update password.')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }

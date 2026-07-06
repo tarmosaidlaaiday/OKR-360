@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { Icon } from '../components/cadence/Icon'
@@ -57,7 +58,7 @@ function CreateCycleForm({ onCreated }: { onCreated: () => void }) {
       })
       onCreated()
     } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : 'Create failed')
+      setErr(getErrorMessage(ex))
     } finally {
       setCreating(false)
     }
@@ -126,14 +127,14 @@ function CycleRow({
   async function transition(status: CycleStatus, extra?: { review_closes_at?: string }) {
     setWorking(true)
     try { await setCycleStatus(cycle.id, status, extra); onStatusChange() }
-    catch (e) { alert(e instanceof Error ? e.message : 'Failed') }
+    catch (e) { alert(getErrorMessage(e)) }
     finally { setWorking(false) }
   }
 
   async function handleLock() {
     setWorking(true)
     try { await lockCycleScores(cycle.id, nextCycleId || null); onLock() }
-    catch (e) { alert(e instanceof Error ? e.message : 'Failed') }
+    catch (e) { alert(getErrorMessage(e)) }
     finally { setWorking(false); setShowLockForm(false) }
   }
 

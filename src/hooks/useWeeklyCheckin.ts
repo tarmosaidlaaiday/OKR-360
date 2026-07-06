@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { getMyKRsForCheckin, submitCheckin, getMyStreak, currentWeekYear } from '../services/weeklyCheckins.service'
@@ -94,7 +95,7 @@ export function useWeeklyCheckin() {
       setStreak(updatedStreak)
       setIsDone(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Submission failed')
+      setError(getErrorMessage(e))
     } finally {
       setIsSubmitting(false)
     }

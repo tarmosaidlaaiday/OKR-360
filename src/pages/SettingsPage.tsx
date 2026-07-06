@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { useTeams } from '../hooks/useTeams'
 import { profilesService } from '../services/profiles.service'
@@ -32,7 +33,7 @@ export function SettingsPage() {
       await refreshProfile()
       setSaved(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }

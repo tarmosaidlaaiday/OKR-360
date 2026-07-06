@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
@@ -40,7 +41,7 @@ export function useSampleData() {
 
       setHasSampleData(false)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to clear sample data'
+      const msg = getErrorMessage(err)
       setClearError(msg)
       throw err
     } finally {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { supabase } from '../../lib/supabase'
@@ -46,7 +47,7 @@ export function ResetPasswordPage() {
       setDone(true)
       setTimeout(() => navigate('/dashboard'), 2000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update password')
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

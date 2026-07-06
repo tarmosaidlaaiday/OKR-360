@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { CdModal } from '../cadence/CdModal'
 import { Icon } from '../cadence/Icon'
 import { TemplatePicker } from './TemplatePicker'
@@ -232,7 +233,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
       const results = await suggestKRs(title.trim())
       setKrs(fromSuggestions(results))
     } catch (e) {
-      setAiError(e instanceof Error ? e.message : "Couldn't generate suggestions — add key results manually")
+      setAiError(getErrorMessage(e))
     } finally {
       setAiLoading(false)
     }
@@ -295,7 +296,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         setKrs([]); setAiError('')
       }
     } catch (ex) {
-      setError(ex instanceof Error ? ex.message : 'Something went wrong')
+      setError(getErrorMessage(ex))
     } finally {
       setLoading(false)
     }

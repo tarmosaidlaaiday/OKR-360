@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useOrg } from '../context/OrgContext'
 import { saveLevels, deleteLevel } from '../services/levels.service'
 import { saveUnits, createUnit, deleteUnit } from '../services/units.service'
@@ -7,7 +8,6 @@ import { LevelsEditor } from '../components/settings/LevelsEditor'
 import { UnitsTree } from '../components/settings/UnitsTree'
 import { CascadeSettings } from '../components/settings/CascadeSettings'
 import { SidebarPreview } from '../components/settings/SidebarPreview'
-import { PageHeader } from '../components/cadence/PageHeader'
 import type { Level, Unit, OrgSettings } from '../types/cadence'
 
 export function OrgStructurePage() {
@@ -71,7 +71,7 @@ export function OrgStructurePage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(getErrorMessage(e))
     } finally {
       setSaving(false)
     }
@@ -84,24 +84,24 @@ export function OrgStructurePage() {
 
   return (
     <div className="cd-page">
-      <PageHeader
-        title="Org structure"
-        sub="Configure your hierarchy, units, and cascade behaviour"
-        actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {saved && <span style={{ fontSize: 13, color: 'var(--ok)' }}>Saved</span>}
-            {error && <span style={{ fontSize: 13, color: 'var(--bad)' }}>{error}</span>}
-            <button
-              className="cd-btn cd-btn-primary"
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !isDirty}
-            >
-              {saving ? 'Saving…' : 'Save changes'}
-            </button>
-          </div>
-        }
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>Org structure</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--muted)' }}>Configure your hierarchy, units, and cascade behaviour</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {saved && <span style={{ fontSize: 13, color: 'var(--ok)' }}>Saved</span>}
+          {error && <span style={{ fontSize: 13, color: 'var(--bad)' }}>{error}</span>}
+          <button
+            className="cd-btn cd-btn-primary"
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !isDirty}
+          >
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
 
       <div className="cd-org-layout">
         {/* Left column: Levels + Units */}

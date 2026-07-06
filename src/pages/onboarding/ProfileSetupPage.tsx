@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { supabase } from '../../lib/supabase'
@@ -45,7 +46,7 @@ export function ProfileSetupPage() {
       await refreshProfile()
       navigate('/dashboard')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Setup failed')
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

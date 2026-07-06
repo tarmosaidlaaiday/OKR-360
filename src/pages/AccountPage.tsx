@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { PageHeader } from '../components/cadence/PageHeader'
@@ -108,7 +109,7 @@ export function AccountPage() {
       setPwSuccess(true)
       setCurrentPw(''); setNewPw(''); setConfirmPw('')
     } catch (e) {
-      setPwError(e instanceof Error ? e.message : 'Failed to update password.')
+      setPwError(getErrorMessage(e))
     } finally {
       setPwLoading(false)
     }

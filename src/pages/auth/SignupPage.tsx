@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getErrorMessage } from '../../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import { Icon } from '../../components/cadence/Icon'
 import { useAuth } from '../../context/AuthContext'
@@ -21,7 +22,7 @@ export function SignupPage() {
       await signUp(email, password, fullName)
       navigate('/dashboard')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign up failed')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }

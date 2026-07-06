@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
   listUsers, getAdminScope,
@@ -27,7 +28,7 @@ export function useUserManagement() {
       setUsers(fetchedUsers)
       setScope(fetchedScope)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load users')
+      setError(getErrorMessage(e))
     } finally {
       setLoading(false)
     }
