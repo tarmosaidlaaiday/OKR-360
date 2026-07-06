@@ -293,8 +293,9 @@ export interface KrTask {
   key_result_id: string
   title: string
   status: KrTaskStatus
+  due_date: string | null
   assignee_id: string | null
-  assignee?: Person
+  assignee?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
   created_by: string
   created_at: string
 }

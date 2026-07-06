@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
@@ -9,8 +9,23 @@ import { StatusChip } from '../components/cadence/StatusChip'
 import { Avatar } from '../components/cadence/Avatar'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
+import { supabase } from '../lib/supabase'
 import { fmt, getQuarterWeeks, getCurrentWeekIdx } from '../lib/cadenceUtils'
 import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus } from '../types/cadence'
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+type SlimProfile = { id: string; full_name: string; avatar_url: string | null; color: string }
+
+function fmtDate(d: string | null): string {
+  if (!d) return ''
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function isOverdue(d: string | null, status: KrTaskStatus): boolean {
+  if (!d || status === 'done') return false
+  return new Date(d + 'T00:00:00') < new Date(new Date().toDateString())
+}
 
 // ── Task check button: cycles todo → in_progress → done → todo ───────────
 
@@ -31,11 +46,26 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 // ── KR row with inline task list ─────────────────────────────────────────
 
 function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
-  const { tasks, addTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
+  const { tasks, addTask, editTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
+  const [people, setPeople] = useState<SlimProfile[]>([])
+
+  // Add-task form state
   const [newTitle, setNewTitle] = useState('')
+  const [newAssignee, setNewAssignee] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
+
+  // Per-task edit state
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editFields, setEditFields] = useState({ title: '', assignee_id: '', due_date: '' })
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, full_name, avatar_url, color').order('full_name')
+      .then(({ data }) => setPeople((data ?? []) as SlimProfile[]))
+  }, [])
 
   function cycleStatus(task: KrTask) {
-    const next: KrTaskStatus = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo'
+    const next: KrTaskStatus = task.status === 'todo' ? 'in_progress'
+      : task.status === 'in_progress' ? 'done' : 'todo'
     updateStatus(task.id, next)
   }
 
@@ -44,7 +74,27 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
     const title = newTitle.trim()
     if (!title) return
     setNewTitle('')
-    await addTask(title)
+    setNewAssignee('')
+    setNewDueDate('')
+    await addTask(title, newAssignee || null, newDueDate || null)
+  }
+
+  function startEdit(task: KrTask) {
+    setEditId(task.id)
+    setEditFields({
+      title: task.title,
+      assignee_id: task.assignee_id ?? '',
+      due_date: task.due_date ?? '',
+    })
+  }
+
+  async function saveEdit(taskId: string) {
+    await editTask(taskId, {
+      title: editFields.title.trim() || undefined,
+      assignee_id: editFields.assignee_id || null,
+      due_date: editFields.due_date || null,
+    })
+    setEditId(null)
   }
 
   return (
@@ -79,22 +129,88 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
       {/* Inline task list */}
       <div className="cd-kr-task-list">
         {tasks.map(task => (
-          <div key={task.id} className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
-            <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
-            <span className="cd-kr-task-title">{task.title}</span>
-            <button
-              type="button"
-              className="cd-kr-task-del cd-btn-icon"
-              onClick={() => removeTask(task.id)}
-              title="Remove task"
-            >
-              <Icon name="x" size={11} />
-            </button>
+          <div key={task.id}>
+            {editId === task.id ? (
+              /* ── Inline edit row ── */
+              <div className="cd-kr-task-row" style={{ flexWrap: 'wrap', gap: 6 }}>
+                <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                <input
+                  className="cd-kr-task-add-input"
+                  value={editFields.title}
+                  onChange={e => setEditFields(f => ({ ...f, title: e.target.value }))}
+                  style={{ flex: 1, minWidth: 100 }}
+                  autoFocus
+                />
+                <select
+                  className="cd-um-select"
+                  value={editFields.assignee_id}
+                  onChange={e => setEditFields(f => ({ ...f, assignee_id: e.target.value }))}
+                  style={{ fontSize: 12, padding: '2px 6px' }}
+                >
+                  <option value="">No assignee</option>
+                  {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+                <input
+                  type="date"
+                  className="cd-um-input"
+                  value={editFields.due_date}
+                  onChange={e => setEditFields(f => ({ ...f, due_date: e.target.value }))}
+                  style={{ fontSize: 12, padding: '2px 6px', width: 130 }}
+                />
+                <button type="button" className="cd-btn cd-btn-primary"
+                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  onClick={() => saveEdit(task.id)}>
+                  Save
+                </button>
+                <button type="button" className="cd-btn"
+                  style={{ fontSize: 11, padding: '2px 8px' }}
+                  onClick={() => setEditId(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              /* ── Display row ── */
+              <div className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
+                <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                {task.assignee && (
+                  <Avatar
+                    person={task.assignee as any}
+                    size={16}
+                  />
+                )}
+                <span className="cd-kr-task-title">{task.title}</span>
+                {task.due_date && (
+                  <span style={{
+                    fontSize: 11,
+                    color: isOverdue(task.due_date, task.status) ? 'var(--bad)' : 'var(--ink-faint)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {fmtDate(task.due_date)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="cd-kr-task-del cd-btn-icon"
+                  onClick={() => startEdit(task)}
+                  title="Edit task"
+                >
+                  <Icon name="pencil" size={11} />
+                </button>
+                <button
+                  type="button"
+                  className="cd-kr-task-del cd-btn-icon"
+                  onClick={() => removeTask(task.id)}
+                  title="Remove task"
+                >
+                  <Icon name="x" size={11} />
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
-        {/* Add task input */}
-        <form className="cd-kr-task-add" onSubmit={handleAddTask}>
+        {/* Add task form */}
+        <form className="cd-kr-task-add" onSubmit={handleAddTask} style={{ flexWrap: 'wrap', gap: 4 }}>
           <button type="submit" className="cd-kr-task-check" style={{ opacity: 0.35 }} tabIndex={-1}>
             <Icon name="plus" size={10} />
           </button>
@@ -103,6 +219,25 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="Add task…"
+            style={{ flex: 1, minWidth: 120 }}
+          />
+          <select
+            className="cd-um-select"
+            value={newAssignee}
+            onChange={e => setNewAssignee(e.target.value)}
+            style={{ fontSize: 12, padding: '2px 6px' }}
+            title="Assignee (optional)"
+          >
+            <option value="">Assign…</option>
+            {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+          </select>
+          <input
+            type="date"
+            className="cd-um-input"
+            value={newDueDate}
+            onChange={e => setNewDueDate(e.target.value)}
+            style={{ fontSize: 12, padding: '2px 6px', width: 130 }}
+            title="Due date (optional)"
           />
         </form>
       </div>
