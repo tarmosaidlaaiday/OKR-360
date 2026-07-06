@@ -184,6 +184,10 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 
 -- ── Seed: KPIs ───────────────────────────────────────────────────────────
+-- WARNING: This block uses EXCEPTION WHEN OTHERS THEN NULL (line ~251).
+-- Any failure inside (missing table, FK violation, etc.) is silently swallowed.
+-- The migration will be recorded as applied even if the seed data was never inserted.
+-- If you need to re-seed KPIs, run the INSERT statements manually in the SQL Editor.
 
 DO $$
 DECLARE
@@ -253,6 +257,7 @@ END $$;
 
 
 -- ── Seed: 1:1 sessions ───────────────────────────────────────────────────
+-- WARNING: Same EXCEPTION WHEN OTHERS THEN NULL pattern — failures are silent.
 
 DO $$
 DECLARE
