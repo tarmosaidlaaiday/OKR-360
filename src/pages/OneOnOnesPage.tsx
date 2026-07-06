@@ -11,6 +11,7 @@ import { Icon } from '../components/cadence/Icon'
 import { confidenceColor } from '../lib/colors'
 import { happinessLabel } from '../lib/cadenceUtils'
 import { supabase } from '../lib/supabase'
+import { getErrorMessage } from '../lib/errors'
 import {
   createDraftSession, duplicateSession, deleteSession, updateSchedule,
 } from '../services/oneOnOnes.service'
@@ -357,6 +358,7 @@ export function OneOnOnesPage() {
   const [pickerSearch, setPickerSearch] = useState('')
   const [allPeople, setAllPeople] = useState<Person[]>([])
   const [pickerCreating, setPickerCreating] = useState(false)
+  const [pickerError, setPickerError] = useState<string | null>(null)
 
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -392,6 +394,7 @@ export function OneOnOnesPage() {
     if (newMeetingOpen) {
       setPickerOpen(true)
       setPickerSearch('')
+      setPickerError(null)
       setNewMeetingOpen(false)
     }
   }, [newMeetingOpen, setNewMeetingOpen])
@@ -399,10 +402,13 @@ export function OneOnOnesPage() {
   async function handlePickerSelect(person: Person) {
     if (!user?.id) return
     setPickerCreating(true)
+    setPickerError(null)
     try {
       await createDraftSession(user.id, person.id)
-    } catch {
-      // Session might already exist — fine
+    } catch (ex) {
+      setPickerError(getErrorMessage(ex))
+      setPickerCreating(false)
+      return // don't close picker or navigate on failure
     } finally {
       setPickerCreating(false)
     }
@@ -875,7 +881,7 @@ export function OneOnOnesPage() {
       {pickerOpen && (
         <div
           className="cd-modal-backdrop"
-          onClick={() => { setPickerOpen(false); setPickerSearch('') }}
+          onClick={() => { setPickerOpen(false); setPickerSearch(''); setPickerError(null) }}
         >
           <div className="cd-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="cd-modal-hd">
@@ -883,7 +889,7 @@ export function OneOnOnesPage() {
               <button
                 type="button"
                 className="cd-btn-icon"
-                onClick={() => { setPickerOpen(false); setPickerSearch('') }}
+                onClick={() => { setPickerOpen(false); setPickerSearch(''); setPickerError(null) }}
               >
                 <Icon name="x" size={15} />
               </button>
@@ -893,9 +899,12 @@ export function OneOnOnesPage() {
                 className="cd-um-input"
                 placeholder="Search by name…"
                 value={pickerSearch}
-                onChange={e => setPickerSearch(e.target.value)}
+                onChange={e => { setPickerSearch(e.target.value); setPickerError(null) }}
                 autoFocus
               />
+              {pickerError && (
+                <p className="cd-um-error">{pickerError}</p>
+              )}
               <div style={{ overflowY: 'auto', maxHeight: 340, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {(() => {
                   const filtered = allPeople.filter(p =>
