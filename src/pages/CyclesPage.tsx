@@ -8,6 +8,53 @@ import {
   type FullCycle, type CycleStatus,
 } from '../services/reviewCycles.service'
 
+// ── Period type helpers ───────────────────────────────────────────────────
+
+type PeriodType = 'year' | 'half' | 'quarter'
+
+function periodBadgeLabel(cycle: FullCycle): string {
+  const pt = cycle.period_type ?? 'quarter'
+  const pn = cycle.period_number ?? cycle.quarter
+  if (pt === 'year') return 'Year'
+  if (pt === 'half') return `H${pn}`
+  return `Q${pn}`
+}
+
+function computeCycleDates(pt: PeriodType, year: number, quarter: number, half: 1 | 2) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate()
+  if (pt === 'year') {
+    return {
+      label: String(year),
+      start_date: `${year}-01-01`,
+      end_date: `${year}-12-31`,
+      quarter: 1,
+      period_number: 1,
+    }
+  }
+  if (pt === 'half') {
+    const sm = half === 1 ? 1 : 7
+    const em = half === 1 ? 6 : 12
+    return {
+      label: `H${half} ${year}`,
+      start_date: `${year}-${pad(sm)}-01`,
+      end_date: `${year}-${pad(em)}-${lastDay(year, em)}`,
+      quarter: half === 1 ? 1 : 3,
+      period_number: half,
+    }
+  }
+  // quarter
+  const sm = (quarter - 1) * 3 + 1
+  const em = quarter * 3
+  return {
+    label: `Q${quarter} ${year}`,
+    start_date: `${year}-${pad(sm)}-01`,
+    end_date: `${year}-${pad(em)}-${lastDay(year, em)}`,
+    quarter,
+    period_number: quarter,
+  }
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────
 
 const STATUS_CFG: Record<CycleStatus, { label: string; color: string }> = {
@@ -30,16 +77,37 @@ function CycleStatusBadge({ status }: { status: CycleStatus }) {
 
 function CreateCycleForm({ onCreated }: { onCreated: () => void }) {
   const currentYear = new Date().getFullYear()
-  const [form, setForm] = useState({
-    label: '', year: currentYear, quarter: 1 as 1 | 2 | 3 | 4,
-    start_date: '', end_date: '', review_closes_at: '',
+  const [periodType, setPeriodType] = useState<PeriodType>('quarter')
+  const [year, setYear] = useState(currentYear)
+  const [quarter, setQuarter] = useState<1|2|3|4>(1)
+  const [half, setHalf] = useState<1|2>(1)
+  const [form, setForm] = useState(() => {
+    const d = computeCycleDates('quarter', currentYear, 1, 1)
+    return { label: d.label, start_date: d.start_date, end_date: d.end_date, review_closes_at: '' }
   })
   const [creating, setCreating] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  // Auto-fill label when year/quarter changes
-  function setYQ(year: number, quarter: number) {
-    setForm(p => ({ ...p, year, quarter: quarter as 1|2|3|4, label: `Q${quarter} ${year}` }))
+  function applyQuickPick(pt: PeriodType, y: number, q: number, h: 1|2) {
+    const d = computeCycleDates(pt, y, q, h)
+    setForm(p => ({ ...p, label: d.label, start_date: d.start_date, end_date: d.end_date }))
+  }
+
+  function handlePeriodType(pt: PeriodType) {
+    setPeriodType(pt)
+    applyQuickPick(pt, year, quarter, half)
+  }
+  function handleYear(y: number) {
+    setYear(y)
+    applyQuickPick(periodType, y, quarter, half)
+  }
+  function handleQuarter(q: 1|2|3|4) {
+    setQuarter(q)
+    applyQuickPick('quarter', year, q, half)
+  }
+  function handleHalf(h: 1|2) {
+    setHalf(h)
+    applyQuickPick('half', year, quarter, h)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -47,11 +115,14 @@ function CreateCycleForm({ onCreated }: { onCreated: () => void }) {
     if (!form.start_date || !form.end_date) { setErr('Start and end dates required'); return }
     setCreating(true)
     setErr(null)
+    const d = computeCycleDates(periodType, year, quarter, half)
     try {
       await createCycle({
-        label: form.label || `Q${form.quarter} ${form.year}`,
-        year: form.year,
-        quarter: form.quarter,
+        label: form.label || d.label,
+        year,
+        quarter: d.quarter,
+        period_type: periodType,
+        period_number: d.period_number,
         start_date: form.start_date,
         end_date: form.end_date,
         review_closes_at: form.review_closes_at || undefined,
@@ -67,17 +138,45 @@ function CreateCycleForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form className="cd-cycles-create-form" onSubmit={handleCreate}>
       <div className="cd-um-invite-title">New cycle</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <select className="cd-um-select" value={form.quarter}
-          onChange={e => setYQ(form.year, parseInt(e.target.value))}>
-          {[1,2,3,4].map(q => <option key={q} value={q}>Q{q}</option>)}
-        </select>
-        <input type="number" className="cd-um-input" value={form.year}
-          onChange={e => setYQ(parseInt(e.target.value) || currentYear, form.quarter)}
+
+      {/* Period type */}
+      <div style={{ display: 'flex', gap: 4 }}>
+        {(['quarter', 'half', 'year'] as PeriodType[]).map(pt => (
+          <button
+            key={pt}
+            type="button"
+            className={`cd-btn${periodType === pt ? ' cd-btn-primary' : ''}`}
+            style={{ fontSize: 12, padding: '4px 10px' }}
+            onClick={() => handlePeriodType(pt)}
+          >
+            {pt === 'quarter' ? 'Quarter' : pt === 'half' ? 'Half-year' : 'Year'}
+          </button>
+        ))}
+      </div>
+
+      {/* Quick-pick */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {periodType === 'quarter' && (
+          <select className="cd-um-select" value={quarter}
+            onChange={e => handleQuarter(parseInt(e.target.value) as 1|2|3|4)}>
+            {[1,2,3,4].map(q => <option key={q} value={q}>Q{q}</option>)}
+          </select>
+        )}
+        {periodType === 'half' && (
+          <select className="cd-um-select" value={half}
+            onChange={e => handleHalf(parseInt(e.target.value) as 1|2)}>
+            <option value={1}>H1</option>
+            <option value={2}>H2</option>
+          </select>
+        )}
+        <input type="number" className="cd-um-input" value={year}
+          onChange={e => handleYear(parseInt(e.target.value) || currentYear)}
           style={{ width: 80 }} />
       </div>
-      <input className="cd-um-input" placeholder="Label (e.g. Q2 2026)"
+
+      <input className="cd-um-input" placeholder="Label"
         value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))} />
+
       <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 3 }}>Start date</div>
@@ -90,11 +189,13 @@ function CreateCycleForm({ onCreated }: { onCreated: () => void }) {
             value={form.end_date} onChange={e => setForm(p => ({ ...p, end_date: e.target.value }))} />
         </div>
       </div>
+
       <div>
         <div style={{ fontSize: 11, color: 'var(--ink-soft)', marginBottom: 3 }}>Review closes (optional)</div>
         <input type="date" className="cd-um-input"
           value={form.review_closes_at} onChange={e => setForm(p => ({ ...p, review_closes_at: e.target.value }))} />
       </div>
+
       {err && <div className="cd-um-error">{err}</div>}
       <button type="submit" className="cd-btn cd-btn-primary" disabled={creating}>
         {creating ? 'Creating…' : 'Create cycle'}
@@ -142,8 +243,15 @@ function CycleRow({
     <div className="cd-cycles-row">
       <div className="cd-cycles-row-main">
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="cd-cycles-label">{cycle.label}</span>
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
+              background: 'color-mix(in oklab, var(--accent) 12%, transparent)',
+              color: 'var(--accent)', letterSpacing: '.03em',
+            }}>
+              {periodBadgeLabel(cycle)}
+            </span>
             <CycleStatusBadge status={cycle.status} />
           </div>
           <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 2 }}>

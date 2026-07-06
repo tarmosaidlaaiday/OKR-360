@@ -36,9 +36,13 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
       const saved = savedId ? data.find(c => c.id === savedId) : null
       if (saved) return saved
 
+      // Auto-selection must always resolve to a quarter cycle — year/half
+      // cycles exist but should never become the default active cycle used
+      // by the dashboard and weekly check-ins.
+      const quarterCycles = data.filter(c => (c.period_type ?? 'quarter') === 'quarter')
       const { year, quarter } = getCurrentQuarter()
-      const byQuarter = data.find(c => c.year === year && c.quarter === quarter)
-      return byQuarter ?? data[data.length - 1] ?? null
+      const byQuarter = quarterCycles.find(c => c.year === year && c.quarter === quarter)
+      return byQuarter ?? quarterCycles[quarterCycles.length - 1] ?? null
     })
   }, [])
 

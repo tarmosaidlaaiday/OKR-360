@@ -41,6 +41,8 @@ export interface Cycle {
   start_date: string
   end_date: string
   created_at: string
+  period_type?: 'year' | 'half' | 'quarter'
+  period_number?: number
 }
 
 export interface KeyResult {

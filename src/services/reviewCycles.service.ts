@@ -12,6 +12,8 @@ export interface FullCycle {
   label: string
   year: number
   quarter: number
+  period_type: 'year' | 'half' | 'quarter'
+  period_number: number
   start_date: string
   end_date: string
   status: CycleStatus
@@ -65,15 +67,22 @@ export interface CycleSummary {
 export async function getCycles(): Promise<FullCycle[]> {
   const { data, error } = await supabase
     .from('cycles')
-    .select('id, label, year, quarter, start_date, end_date, status, review_open_at, review_closes_at, created_by')
+    .select('id, label, year, quarter, period_type, period_number, start_date, end_date, status, review_open_at, review_closes_at, created_by')
     .order('year', { ascending: false })
-    .order('quarter', { ascending: false })
+    .order('period_type', { ascending: true })
+    .order('period_number', { ascending: false })
   if (error) throw error
-  return ((data ?? []) as any[]).map(c => ({ ...c, status: c.status ?? 'active' }))
+  return ((data ?? []) as any[]).map(c => ({
+    ...c,
+    status: c.status ?? 'active',
+    period_type: c.period_type ?? 'quarter',
+    period_number: c.period_number ?? c.quarter ?? 1,
+  }))
 }
 
 export async function createCycle(input: {
   label: string; year: number; quarter: number;
+  period_type: 'year' | 'half' | 'quarter'; period_number: number;
   start_date: string; end_date: string; review_closes_at?: string
 }): Promise<FullCycle> {
   const { data: { user } } = await supabase.auth.getUser()
@@ -81,7 +90,7 @@ export async function createCycle(input: {
   const { data, error } = await supabase
     .from('cycles')
     .insert({ ...input, status: 'draft', created_by: user?.id ?? null, org_id: orgId })
-    .select('id, label, year, quarter, start_date, end_date, status, review_open_at, review_closes_at, created_by')
+    .select('id, label, year, quarter, period_type, period_number, start_date, end_date, status, review_open_at, review_closes_at, created_by')
     .single()
   if (error) throw error
   return data as unknown as FullCycle

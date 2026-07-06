@@ -419,9 +419,14 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
               disabled={isEdit}
             >
               <option value="">Select a cycle…</option>
-              {cycles.map(c => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
+              {cycles.map(c => {
+                const pt = c.period_type ?? 'quarter'
+                const pn = c.period_number ?? c.quarter
+                const tag = pt === 'year' ? 'Year' : pt === 'half' ? `H${pn}` : `Q${pn}`
+                return (
+                  <option key={c.id} value={c.id}>[{tag}] {c.label}</option>
+                )
+              })}
             </select>
           )}
         </label>
