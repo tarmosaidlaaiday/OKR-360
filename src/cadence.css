@@ -1677,25 +1677,6 @@ kbd.cd-kbd {
 }
 .cd-textarea:focus { border-color: var(--accent); }
 
-/* Dashboard */
-.cd-dash-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
-  gap: var(--d-gap-grid, 16px);
-}
-.cd-dash-okrs { grid-column: 1 / 2; }
-.cd-dash-tasks { grid-column: 2 / 3; }
-.cd-dash-1on1s { grid-column: 1 / -1; }
-
-.cd-obj-list { display: flex; flex-direction: column; gap: 8px; padding: 0 var(--d-pad-card, 16px) var(--d-pad-card, 16px); }
-.cd-obj-row { display: flex; flex-direction: column; gap: 4px; }
-.cd-obj-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cd-obj-title { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd-obj-row-bot { display: flex; align-items: center; gap: 8px; }
-.cd-obj-pct { font-size: 11px; color: var(--ink-faint); font-family: "Geist Mono", monospace; white-space: nowrap; }
-.cd-conf-badge { font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 4px; color: #fff; font-family: "Geist Mono", monospace; }
-
 /* Tasks */
 .cd-task-list { display: flex; flex-direction: column; gap: 2px; list-style: none; margin: 0; padding: 0 var(--d-pad-card, 16px) var(--d-pad-card, 16px); }
 .cd-task-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
