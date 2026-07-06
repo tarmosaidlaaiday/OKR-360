@@ -94,8 +94,8 @@ Deno.serve(async (req: Request) => {
 
     // ── Action: invite ────────────────────────────────────────────────────
     if (action === 'invite') {
-      const { email, unit_id, role = 'member' } = payload
-      if (!email || !unit_id) throw new Error('email and unit_id are required')
+      const { email, unit_id, role = 'member', full_name } = payload
+      if (!email || !unit_id || !full_name) throw new Error('full_name, email, and unit_id are required')
 
       // Fetch org name for personalised email subject/body
       const { data: orgRow } = await supabaseAdmin
@@ -109,7 +109,7 @@ Deno.serve(async (req: Request) => {
       const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
         email,
         {
-          data: { org_name: orgName },
+          data: { org_name: orgName, full_name },
           redirectTo: `${siteUrl}/onboarding/profile`,
         },
       )
@@ -124,6 +124,7 @@ Deno.serve(async (req: Request) => {
       const { error: profileErr } = await supabaseAdmin.from('profiles').upsert({
         id: userId,
         email,
+        full_name,
         org_id: callerOrgId,
         status: 'pending',
         must_change_password: false,

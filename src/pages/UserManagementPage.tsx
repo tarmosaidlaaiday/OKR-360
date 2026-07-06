@@ -137,7 +137,7 @@ function CreateUserForm({
   allowedRoles: UnitRole[]
   orgId: string | null
   onCreate: (p: { name: string; email: string; password: string; unit_id: string; role: UnitRole; must_change_password: boolean }) => Promise<void>
-  onInvite: (p: { email: string; unit_id: string; role: UnitRole; org_id: string }) => Promise<void>
+  onInvite: (p: { full_name: string; email: string; unit_id: string; role: UnitRole; org_id: string }) => Promise<void>
   onCancel: () => void
 }) {
   const [manualMode, setManualMode] = useState(false)
@@ -153,12 +153,12 @@ function CreateUserForm({
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.email || !form.unit_id) { setErr('Email and unit are required'); return }
+    if (!form.name || !form.email || !form.unit_id) { setErr('Name, email, and unit are required'); return }
     if (!orgId) { setErr('No organisation found'); return }
     setSubmitting(true)
     setErr(null)
     try {
-      await onInvite({ email: form.email, unit_id: form.unit_id, role: form.role, org_id: orgId })
+      await onInvite({ full_name: form.name, email: form.email, unit_id: form.unit_id, role: form.role, org_id: orgId })
       setSuccess(`Invitation sent to ${form.email}. They'll receive a magic-link to set up their account.`)
     } catch (ex) {
       setErr(getErrorMessage(ex))
@@ -220,12 +220,10 @@ function CreateUserForm({
         </button>
       </div>
 
-      {manualMode && (
-        <input
-          className="cd-um-input" placeholder="Full name *" required
-          value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-        />
-      )}
+      <input
+        className="cd-um-input" placeholder="Full name *" required
+        value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+      />
       <input
         className="cd-um-input" type="email" placeholder="Email address *" required
         value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
@@ -358,7 +356,7 @@ function UserList({
   allowedRoles: UnitRole[]
   orgId: string | null
   onCreate: (p: { name: string; email: string; password: string; unit_id: string; role: UnitRole; must_change_password: boolean }) => Promise<void>
-  onInvite: (p: { email: string; unit_id: string; role: UnitRole; org_id: string }) => Promise<void>
+  onInvite: (p: { full_name: string; email: string; unit_id: string; role: UnitRole; org_id: string }) => Promise<void>
 }) {
   const [tab, setTab] = useState<FilterTab>('all')
   const [search, setSearch] = useState('')

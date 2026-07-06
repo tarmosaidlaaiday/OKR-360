@@ -89,6 +89,7 @@ export function useUserManagement() {
   }
 
   async function doInviteUser(payload: {
+    full_name: string
     email: string
     unit_id: string
     role: UnitRole

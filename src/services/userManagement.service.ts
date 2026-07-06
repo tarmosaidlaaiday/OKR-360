@@ -209,6 +209,7 @@ export async function resetUserPassword(personId: string, newPassword: string): 
 // ── Email invitation (magic-link) ─────────────────────────────────────────
 
 export async function inviteUser(payload: {
+  full_name: string
   email: string
   unit_id: string
   role: UnitRole
