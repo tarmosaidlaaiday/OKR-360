@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
-  getMyReports, getMyManager, getSessionsForPair,
+  getMyReports, getMyManager, getSessionsForPair, getOneOnOnePartners,
   createDraftSession, upsertEntry, submitSession, updateSessionEntry,
 } from '../services/oneOnOnes.service'
 import type { OneOnOne, OneOnOneEntry, Person } from '../types/cadence'
@@ -10,6 +10,7 @@ export function useOneOnOnes() {
   const { user, profile } = useAuth()
   const [reports, setReports] = useState<Person[]>([])
   const [manager, setManager] = useState<Person | null>(null)
+  const [partners, setPartners] = useState<Person[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<OneOnOne[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +46,14 @@ export function useOneOnOnes() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [user?.id])
+
+  // Load everyone the user has actual 1:1 sessions with (superset of reports/manager)
+  const loadPartners = useCallback(async () => {
+    if (!user?.id) return
+    getOneOnOnePartners(user.id).then(setPartners).catch(() => {})
+  }, [user?.id])
+
+  useEffect(() => { loadPartners() }, [loadPartners])
 
   // When the selected person changes, reset open session so loadSessions
   // will initialize it to the draft.
@@ -131,7 +140,17 @@ export function useOneOnOnes() {
     await loadSessions(selectedId)
   }, [draft, user?.id, selectedId, profile, loadSessions])
 
-  const people: Person[] = reports.length > 0 ? reports : (manager ? [manager] : [])
+  // Combine actual session partners (source of truth) with reporting-line
+  // fallback. Partners go first so anyone added via the picker is always visible.
+  const people: Person[] = useMemo(() => {
+    const combined = new Map<string, Person>()
+    for (const p of partners) combined.set(p.id, p)
+    for (const p of (reports.length > 0 ? reports : (manager ? [manager] : []))) {
+      if (!combined.has(p.id)) combined.set(p.id, p)
+    }
+    return Array.from(combined.values())
+  }, [partners, reports, manager])
+
   const isManager = reports.length > 0
 
   const reload = useCallback(() => {
@@ -156,5 +175,6 @@ export function useOneOnOnes() {
     updateSession,
     submitDraft,
     reload,
+    refreshPartners: loadPartners,
   }
 }

@@ -344,6 +344,7 @@ export function OneOnOnesPage() {
     openSessionId, openSession,
     selectSession,
     saveEntry, updateSession, submitDraft, reload,
+    refreshPartners,
   } = hook
 
   const [tab, setTab] = useState<TabId>('personal')
@@ -412,6 +413,7 @@ export function OneOnOnesPage() {
     } finally {
       setPickerCreating(false)
     }
+    await refreshPartners()
     setSelectedId(person.id)
     setPickerOpen(false)
     setPickerSearch('')

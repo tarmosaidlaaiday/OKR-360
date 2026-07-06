@@ -70,6 +70,26 @@ export async function getMyManager(userId: string): Promise<Person | null> {
   return lead?.person ? profileToPerson(lead.person) : null
 }
 
+// ── Everyone the current user has any one_on_ones row with ───────────────
+
+export async function getOneOnOnePartners(userId: string): Promise<Person[]> {
+  const { data, error } = await supabase
+    .from('one_on_ones')
+    .select(`
+      manager_id, report_id,
+      manager:profiles!manager_id(id, full_name, avatar_url, color, job_title),
+      report:profiles!report_id(id, full_name, avatar_url, color, job_title)
+    `)
+    .or(`manager_id.eq.${userId},report_id.eq.${userId}`)
+  if (error) throw error
+  const seen = new Map<string, Person>()
+  for (const row of (data ?? []) as any[]) {
+    const other = row.manager_id === userId ? row.report : row.manager
+    if (other && !seen.has(other.id)) seen.set(other.id, profileToPerson(other))
+  }
+  return Array.from(seen.values())
+}
+
 // ── Sessions for a pair ───────────────────────────────────────────────────
 
 export async function getSessionsForPair(
