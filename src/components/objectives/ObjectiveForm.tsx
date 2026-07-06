@@ -50,7 +50,6 @@ function KrDraftCard({
 }) {
   const titleRef = useRef<HTMLInputElement>(null)
 
-  // Focus title input when card becomes checked
   useEffect(() => {
     if (draft.checked) titleRef.current?.focus()
   }, [draft.checked])
@@ -67,7 +66,6 @@ function KrDraftCard({
       onClick={!draft.checked ? onToggle : undefined}
       style={{ cursor: draft.checked ? 'default' : 'pointer' }}
     >
-      {/* Checkbox */}
       <input
         type="checkbox"
         checked={draft.checked}
@@ -76,10 +74,8 @@ function KrDraftCard({
         className="cd-ai-suggestion-chk"
       />
 
-      {/* Body */}
       <div className="cd-ai-suggestion-body" style={{ flex: 1, minWidth: 0 }}>
         {draft.checked ? (
-          /* Editable mode */
           <div className="cd-kr-edit">
             <input
               ref={titleRef}
@@ -129,7 +125,6 @@ function KrDraftCard({
             </div>
           </div>
         ) : (
-          /* Read-only mode */
           <div className="cd-ai-suggestion-body">
             <span className="cd-ai-suggestion-title">{draft.title || <em>Untitled</em>}</span>
             <span className="cd-ai-suggestion-meta">{targetDisplay}</span>
@@ -153,11 +148,12 @@ interface ObjectiveFormProps {
 }
 
 export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveFormProps) {
-  const { activeCycle } = useCycle()
+  const { activeCycle, cycles, refresh } = useCycle()
   const isEdit = !!objective
 
   const [title, setTitle]               = useState(objective?.title ?? '')
   const [description, setDescription]   = useState(objective?.description ?? '')
+  const [cycleId, setCycleId]           = useState<string>(objective?.cycle_id ?? '')
   const [unitId, setUnitId]             = useState<string>(objective?.unit_id ?? '')
   const [parentId, setParentId]         = useState<string>((objective as any)?.parent_objective_id ?? '')
   const [status, setStatus]             = useState<ObjectiveStatus>(objective?.status ?? 'on_track')
@@ -167,33 +163,46 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   const [units, setUnits]               = useState<UnitOption[]>([])
   const [parentOpts, setParentOpts]     = useState<ObjOption[]>([])
 
-  // Unified KR draft list (replaces suggestions + accepted Set)
   const [krs, setKrs]                   = useState<KRDraft[]>([])
   const [aiLoading, setAiLoading]       = useState(false)
   const [aiError, setAiError]           = useState('')
   const [tplOpen, setTplOpen]           = useState(false)
 
+  // Default cycleId once cycles are available (only when not already set)
+  useEffect(() => {
+    if (cycleId || isEdit) return
+    const fallback = activeCycle?.id ?? cycles[cycles.length - 1]?.id ?? ''
+    if (fallback) setCycleId(fallback)
+  }, [cycles, activeCycle, cycleId, isEdit])
+
+  // Load units + parent objectives when the modal opens; also refresh cycles
+  // so a cycle just created in Settings appears without a full page reload.
   useEffect(() => {
     if (!open) return
+    refresh()
     supabase.from('units').select('id, name').order('name').then(({ data }) => {
       setUnits((data ?? []) as UnitOption[])
     })
-    if (activeCycle?.id) {
-      supabase
-        .from('objectives')
-        .select('id, title')
-        .eq('cycle_id', activeCycle.id)
-        .order('title')
-        .then(({ data }) => {
-          const opts = ((data ?? []) as ObjOption[]).filter(o => o.id !== objective?.id)
-          setParentOpts(opts)
-        })
-    }
-  }, [open, activeCycle?.id, objective?.id])
+  }, [open, refresh])
+
+  // Re-fetch parent objectives whenever the selected cycle changes
+  useEffect(() => {
+    if (!cycleId) { setParentOpts([]); return }
+    supabase
+      .from('objectives')
+      .select('id, title')
+      .eq('cycle_id', cycleId)
+      .order('title')
+      .then(({ data }) => {
+        const opts = ((data ?? []) as ObjOption[]).filter(o => o.id !== objective?.id)
+        setParentOpts(opts)
+      })
+  }, [cycleId, objective?.id])
 
   useEffect(() => {
     setTitle(objective?.title ?? '')
     setDescription(objective?.description ?? '')
+    setCycleId(objective?.cycle_id ?? '')
     setUnitId(objective?.unit_id ?? '')
     setParentId((objective as any)?.parent_objective_id ?? '')
     setStatus(objective?.status ?? 'on_track')
@@ -250,7 +259,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) { setError('Title is required'); return }
-    if (!activeCycle) { setError('No active cycle selected'); return }
+    if (!cycleId) { setError('Please select a cycle'); return }
     setLoading(true)
     setError('')
     try {
@@ -259,11 +268,10 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         description: description.trim() || undefined,
         unit_id: unitId || null,
         parent_objective_id: parentId || null,
-        cycle_id: activeCycle.id,
+        cycle_id: cycleId,
         status,
       })
 
-      // Create checked KRs if we got back the objective ID
       const toCreate = krs.filter(k => k.checked && k.title.trim())
       if (typeof objectiveId === 'string' && toCreate.length > 0) {
         await Promise.all(
@@ -281,7 +289,9 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
 
       onClose()
       if (!isEdit) {
-        setTitle(''); setDescription(''); setUnitId(''); setParentId(''); setStatus('on_track')
+        setTitle(''); setDescription('')
+        setCycleId(activeCycle?.id ?? '')
+        setUnitId(''); setParentId(''); setStatus('on_track')
         setKrs([]); setAiError('')
       }
     } catch (ex) {
@@ -293,6 +303,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
 
   const checkedCount = krs.filter(k => k.checked && k.title.trim()).length
   const canSuggest   = !isEdit && title.trim().length >= 4
+  const noCycles     = cycles.length === 0
 
   return (
     <CdModal open={open} onClose={onClose} title={isEdit ? 'Edit Objective' : 'New Objective'} width={540}>
@@ -390,6 +401,30 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
           </div>
         )}
 
+        {/* Cycle */}
+        <label className="cd-field">
+          <span className="cd-field-lbl">
+            Cycle <span style={{ color: 'var(--bad)' }}>*</span>
+          </span>
+          {noCycles ? (
+            <p className="cd-empty-hint" style={{ margin: 0, fontSize: 13 }}>
+              No cycles yet — create one in Settings → Cycles first.
+            </p>
+          ) : (
+            <select
+              className="cd-um-select"
+              value={cycleId}
+              onChange={e => setCycleId(e.target.value)}
+              disabled={isEdit}
+            >
+              <option value="">Select a cycle…</option>
+              {cycles.map(c => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          )}
+        </label>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {/* Unit */}
           <label className="cd-field">
@@ -438,13 +473,6 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
           </label>
         )}
 
-        {/* Cycle hint */}
-        {activeCycle && (
-          <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0 }}>
-            Cycle: <strong style={{ color: 'var(--ink-mid)' }}>{activeCycle.label}</strong>
-          </p>
-        )}
-
         {error && (
           <p style={{ fontSize: 13, color: 'var(--bad)', margin: 0 }}>{error}</p>
         )}
@@ -453,7 +481,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
           <button type="button" className="cd-btn cd-btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="cd-btn cd-btn-primary" disabled={loading}>
+          <button type="submit" className="cd-btn cd-btn-primary" disabled={loading || noCycles}>
             {loading
               ? 'Saving…'
               : isEdit

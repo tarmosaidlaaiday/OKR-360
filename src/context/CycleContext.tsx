@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { cyclesService } from '../services/cycles.service'
 import { getCurrentQuarter } from '../lib/utils'
 import type { Cycle } from '../types'
@@ -8,6 +8,7 @@ interface CycleContextValue {
   activeCycle: Cycle | null
   setActiveCycle: (cycle: Cycle) => void
   loading: boolean
+  refresh: () => Promise<void>
 }
 
 const CycleContext = createContext<CycleContextValue | null>(null)
@@ -18,22 +19,32 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
   const [activeCycle, setActiveCycleState] = useState<Cycle | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    cyclesService.getAll().then((data) => {
-      setCycles(data)
-      const savedId = localStorage.getItem(STORAGE_KEY)
-      const saved = savedId ? data.find((c) => c.id === savedId) : null
+  const refresh = useCallback(async () => {
+    const data = await cyclesService.getAll()
+    setCycles(data)
 
-      if (saved) {
-        setActiveCycleState(saved)
-      } else {
-        // Default to current quarter
-        const { year, quarter } = getCurrentQuarter()
-        const current = data.find((c) => c.year === year && c.quarter === quarter)
-        setActiveCycleState(current ?? data[data.length - 1] ?? null)
+    // Only auto-pick a cycle if nothing is selected yet — don't yank the
+    // user's already-selected cycle out from under them on subsequent refreshes.
+    setActiveCycleState(current => {
+      if (current) {
+        // Keep current selection but update to fresh data if the cycle still exists
+        const still = data.find(c => c.id === current.id)
+        return still ?? current
       }
-    }).finally(() => setLoading(false))
+
+      const savedId = localStorage.getItem(STORAGE_KEY)
+      const saved = savedId ? data.find(c => c.id === savedId) : null
+      if (saved) return saved
+
+      const { year, quarter } = getCurrentQuarter()
+      const byQuarter = data.find(c => c.year === year && c.quarter === quarter)
+      return byQuarter ?? data[data.length - 1] ?? null
+    })
   }, [])
+
+  useEffect(() => {
+    refresh().finally(() => setLoading(false))
+  }, [refresh])
 
   function setActiveCycle(cycle: Cycle) {
     setActiveCycleState(cycle)
@@ -41,7 +52,7 @@ export function CycleProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <CycleContext.Provider value={{ cycles, activeCycle, setActiveCycle, loading }}>
+    <CycleContext.Provider value={{ cycles, activeCycle, setActiveCycle, loading, refresh }}>
       {children}
     </CycleContext.Provider>
   )
