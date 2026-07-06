@@ -28,22 +28,35 @@ BEGIN
   END LOOP;
 END $$;
 
--- 2. Drop any remaining unique indexes not backed by a constraint
+-- 2. Drop any remaining unique indexes not backed by a constraint (excludes PKs)
 DO $$
 DECLARE
   r RECORD;
 BEGIN
   FOR r IN
-    SELECT indexname
-    FROM pg_indexes
-    WHERE tablename = 'cycles'
-      AND schemaname = 'public'
-      AND indexdef ILIKE '%UNIQUE%'
+    SELECT i.indexname
+    FROM pg_indexes i
+    JOIN pg_class c  ON c.relname = i.indexname
+                     AND c.relnamespace = 'public'::regnamespace
+    JOIN pg_index pi ON pi.indexrelid = c.oid
+    WHERE i.tablename  = 'cycles'
+      AND i.schemaname = 'public'
+      AND i.indexdef   ILIKE '%UNIQUE%'
+      AND NOT pi.indisprimary   -- never touch the PK index
   LOOP
     EXECUTE format('DROP INDEX IF EXISTS public.%I', r.indexname);
   END LOOP;
 END $$;
 
--- 3. Add the org-scoped unique constraint
-ALTER TABLE public.cycles
-  ADD CONSTRAINT cycles_org_year_quarter_key UNIQUE (org_id, year, quarter);
+-- 3. Add the org-scoped unique constraint (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'cycles_org_year_quarter_key'
+      AND conrelid = 'public.cycles'::regclass
+  ) THEN
+    ALTER TABLE public.cycles
+      ADD CONSTRAINT cycles_org_year_quarter_key UNIQUE (org_id, year, quarter);
+  END IF;
+END $$;
