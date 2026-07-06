@@ -80,10 +80,11 @@ Deno.serve(async (req: Request) => {
       )
       if (pwErr) throw pwErr
 
-      await supabaseAdmin
+      const { error: profileErr } = await supabaseAdmin
         .from('profiles')
         .update({ must_change_password: true })
         .eq('id', person_id)
+      if (profileErr) throw new Error(`profiles update: ${profileErr.message}`)
 
       return new Response(
         JSON.stringify({ success: true }),
@@ -118,24 +119,31 @@ Deno.serve(async (req: Request) => {
 
       // Upsert profile with pending status + org assignment.
       // org_id is always taken from the caller's profile — never from payload.
-      await supabaseAdmin.from('profiles').upsert({
+      // The on_auth_user_created trigger may have already inserted a row with
+      // org_id = NULL; this upsert must override that.
+      const { error: profileErr } = await supabaseAdmin.from('profiles').upsert({
         id: userId,
         email,
         org_id: callerOrgId,
         status: 'pending',
         must_change_password: false,
       }, { onConflict: 'id' })
+      if (profileErr) throw new Error(`profiles upsert: ${profileErr.message}`)
 
       // Assign primary unit membership
-      await supabaseAdmin.from('people_units').insert({
+      const { error: unitErr } = await supabaseAdmin.from('people_units').insert({
         person_id: userId,
         unit_id,
         role,
         is_primary: true,
         org_id: callerOrgId,
-      }).then(() => {}) // ignore conflict if already exists
+      })
+      // A duplicate (person already in this unit) is not fatal — log but continue
+      if (unitErr && !unitErr.message.includes('duplicate')) {
+        console.error('people_units insert error:', unitErr.message)
+      }
 
-      // Log to audit_log
+      // Log to audit_log (best-effort — don't fail the invite if this errors)
       await supabaseAdmin.from('audit_log').insert({
         org_id: callerOrgId,
         actor_id: caller.id,
@@ -169,33 +177,31 @@ Deno.serve(async (req: Request) => {
     const userId = createdUser.user!.id
 
     // 2. Upsert profile (the on_auth_user_created trigger may have already fired)
-    await supabaseAdmin
+    const { error: profileErr } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: userId,
         full_name: name,
         email,
+        org_id: callerOrgId,
         status: 'active',
         must_change_password,
       }, { onConflict: 'id' })
+    if (profileErr) throw new Error(`profiles upsert: ${profileErr.message}`)
 
     // 3. Add primary unit membership
-    await supabaseAdmin
+    const { error: unitErr } = await supabaseAdmin
       .from('people_units')
       .insert({
         person_id: userId,
         unit_id,
         role,
         is_primary: true,
+        org_id: callerOrgId,
       })
-
-    // 4. Assign org from caller's profile (callerOrgId already verified above)
-    await supabaseAdmin.from('profiles')
-      .update({ org_id: callerOrgId })
-      .eq('id', userId)
-    await supabaseAdmin.from('people_units')
-      .update({ org_id: callerOrgId })
-      .eq('person_id', userId)
+    if (unitErr && !unitErr.message.includes('duplicate')) {
+      throw new Error(`people_units insert: ${unitErr.message}`)
+    }
 
     return new Response(
       JSON.stringify({ person_id: userId, success: true }),
