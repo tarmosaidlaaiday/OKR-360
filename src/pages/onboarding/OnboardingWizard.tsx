@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type Step = 'org' | 'structure' | 'invite' | 'choice'
+type Step = 'org' | 'invite' | 'choice'
 
 interface OrgDraft {
   name: string
@@ -27,7 +27,7 @@ const SIZES = [
   { value: '500+',    label: '500+ people' },
 ]
 
-const STEP_ORDER: Step[] = ['org', 'structure', 'invite', 'choice']
+const STEP_ORDER: Step[] = ['org', 'invite', 'choice']
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -101,52 +101,6 @@ function StepOrg({ draft, onChange, onNext, loading, error }: {
   )
 }
 
-function StepStructure({ onNext, onSkip, orgName }: { onNext: (units: string[]) => void; onSkip: () => void; orgName: string }) {
-  const [units, setUnits] = useState([orgName || ''])
-
-  function updateUnit(i: number, val: string) {
-    setUnits(prev => prev.map((u, idx) => idx === i ? val : u))
-  }
-  function addUnit() { setUnits(prev => [...prev, '']) }
-  function removeUnit(i: number) { setUnits(prev => prev.filter((_, idx) => idx !== i)) }
-
-  return (
-    <div className="cd-onboard-step">
-      <h2 className="cd-onboard-step-title">Add your top-level teams</h2>
-      <p className="cd-onboard-step-sub">e.g. Engineering, Marketing, Sales. You can add more later.</p>
-
-      <div className="cd-onboard-unit-list">
-        {units.map((u, i) => (
-          <div key={i} className="cd-onboard-unit-row">
-            <input
-              className="cd-input"
-              value={u}
-              onChange={e => updateUnit(i, e.target.value)}
-              placeholder={`Team ${i + 1}`}
-            />
-            {units.length > 1 && (
-              <button type="button" className="cd-icon-btn" onClick={() => removeUnit(i)}>
-                <Icon name="x" size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-        <button type="button" className="cd-btn cd-btn--ghost" onClick={addUnit}>
-          + Add team
-        </button>
-      </div>
-
-      <div className="cd-onboard-actions">
-        <button className="cd-btn cd-btn--primary" onClick={() => onNext(units.filter(u => u.trim()))}>
-          Continue
-        </button>
-        <button className="cd-btn cd-btn--ghost" onClick={onSkip}>
-          Skip for now
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function StepInvite({ onNext, onSkip }: { onNext: (emails: string[]) => void; onSkip: () => void }) {
   const [emails, setEmails] = useState([''])
@@ -342,7 +296,7 @@ export function OnboardingWizard() {
 
       setOrgId(newOrgId)
       await refreshProfile()
-      setStep('structure')
+      setStep('invite')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create organisation')
     } finally {
@@ -350,18 +304,7 @@ export function OnboardingWizard() {
     }
   }
 
-  // ── Step 2: create top-level units ─────────────────────────────────────
-
-  async function handleStructureNext(unitNames: string[]) {
-    if (orgId && unitNames.length > 0) {
-      await supabase.from('units').insert(
-        unitNames.map(name => ({ name, org_id: orgId, parent_id: null }))
-      )
-    }
-    setStep('invite')
-  }
-
-  // ── Step 3: queue invite emails ────────────────────────────────────────
+  // ── Step 2: queue invite emails ────────────────────────────────────────
 
   async function handleInviteNext(emails: string[]) {
     if (orgId && emails.length > 0) {
@@ -440,9 +383,6 @@ export function OnboardingWizard() {
             loading={loading}
             error={error}
           />
-        )}
-        {step === 'structure' && (
-          <StepStructure onNext={handleStructureNext} onSkip={() => setStep('invite')} orgName={orgDraft.name} />
         )}
         {step === 'invite' && (
           <StepInvite onNext={handleInviteNext} onSkip={() => setStep('choice')} />
