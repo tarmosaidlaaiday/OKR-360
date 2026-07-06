@@ -1,0 +1,45 @@
+name: Deploy Supabase (migrations + edge functions)
+
+# Runs on every push to main, after Netlify has already picked up the
+# frontend build.  Keeps all three deployment surfaces in sync automatically.
+#
+# Required secrets (add in GitHub → Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   — personal access token from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF    — githzeldiwxkmruhaver
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Only run when DB or edge-function files actually changed
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    name: Push migrations & deploy edge functions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for npx supabase)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Push pending migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase db push --linked --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --yes
+
+      - name: Deploy edge functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
