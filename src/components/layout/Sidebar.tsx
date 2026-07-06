@@ -3,6 +3,7 @@ import { Icon } from '../cadence/Icon'
 import { Avatar } from '../cadence/Avatar'
 import { useAuth } from '../../context/AuthContext'
 import { useOrg } from '../../context/OrgContext'
+import { useCycle } from '../../context/CycleContext'
 import { profileToPerson } from '../../lib/cadenceUtils'
 
 const MAIN_NAV = [
@@ -74,11 +75,30 @@ export function Sidebar() {
   const { profile, signOut } = useAuth()
   const navigate = useNavigate()
   const me = profile ? profileToPerson(profile) : null
+  const { cycles, activeCycle, setActiveCycle } = useCycle()
 
   return (
     <nav className="cd-side">
       {/* Brand */}
       <OrgBrand />
+
+      {/* Cycle selector */}
+      {cycles.length > 0 && (
+        <div className="cd-side-cycle">
+          <select
+            className="cd-input cd-side-cycle-select"
+            value={activeCycle?.id ?? ''}
+            onChange={e => {
+              const c = cycles.find(c => c.id === e.target.value)
+              if (c) setActiveCycle(c)
+            }}
+          >
+            {cycles.map(c => (
+              <option key={c.id} value={c.id}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Main nav */}
       <ul className="cd-side-nav" style={{ listStyle: 'none', margin: 0, padding: 0 }}>

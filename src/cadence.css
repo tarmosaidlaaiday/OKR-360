@@ -183,6 +183,8 @@ button { font-family: inherit; }
   text-transform: uppercase;
 }
 
+.cd-side-cycle { padding: 0 12px 8px; }
+.cd-side-cycle-select { width: 100%; font-size: 13px; padding: 6px 8px; }
 .cd-side-nav, .cd-side-group { display: flex; flex-direction: column; gap: 1px; }
 .cd-side-grp-lbl {
   font-size: 10px;

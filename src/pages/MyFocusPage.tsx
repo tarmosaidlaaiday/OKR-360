@@ -169,12 +169,13 @@ export function MyFocusPage() {
   const year = activeCycle?.year ?? new Date().getFullYear()
 
   const userId = profile?.id ?? null
-  const { objectives, loading } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
+  const { objectives, loading, error } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
 
   const weeks = getQuarterWeeks(quarter)
   const currentWeekIdx = getCurrentWeekIdx(quarter)
 
   if (loading) return <div className="cd-page"><p className="cd-loading">Loading…</p></div>
+  if (error) return <div className="cd-page"><p style={{ color: 'var(--bad)', padding: '16px 0' }}>{error}</p></div>
 
   return (
     <div className="cd-page">

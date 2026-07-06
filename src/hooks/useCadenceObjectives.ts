@@ -7,10 +7,12 @@ import type { CadenceObjective, CadenceKeyResult } from '../types/cadence'
 export function useCadenceObjectives(cycleId: string | null, quarter: number, year: number) {
   const [objectives, setObjectives] = useState<CadenceObjective[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!cycleId) { setLoading(false); return }
     setLoading(true)
+    setError(null)
 
     async function load() {
       const { data: objs, error } = await supabase
@@ -27,7 +29,12 @@ export function useCadenceObjectives(cycleId: string | null, quarter: number, ye
         .eq('cycle_id', cycleId)
         .order('created_at', { ascending: true })
 
-      if (error || !objs) { setLoading(false); return }
+      if (error || !objs) {
+        console.error('[useCadenceObjectives] query failed', error)
+        setError(error?.message ?? 'Failed to load objectives')
+        setLoading(false)
+        return
+      }
 
       const allKrIds = objs.flatMap((o: any) => (o.key_results ?? []).map((k: any) => k.id))
       const weeks = getQuarterWeeks(quarter)
@@ -62,5 +69,5 @@ export function useCadenceObjectives(cycleId: string | null, quarter: number, ye
     load()
   }, [cycleId, quarter, year])
 
-  return { objectives, loading, setObjectives }
+  return { objectives, loading, error, setObjectives }
 }

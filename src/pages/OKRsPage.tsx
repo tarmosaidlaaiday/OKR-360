@@ -226,7 +226,7 @@ export function OKRsPage() {
   const quarter = activeCycle?.quarter ?? 1
   const year = activeCycle?.year ?? new Date().getFullYear()
 
-  const { objectives, loading } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
+  const { objectives, loading, error } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
   const { levels } = useOrg()
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
@@ -263,6 +263,7 @@ export function OKRsPage() {
   const displayRows = viewMode === 'cascade' ? flatCascade : filteredObjectives.map(o => ({ obj: o, depth: 0, children: [] }))
 
   if (loading) return <div className="cd-page"><p className="cd-loading">Loading objectives…</p></div>
+  if (error) return <div className="cd-page"><p style={{ color: 'var(--bad)', padding: '16px 0' }}>{error}</p></div>
 
   return (
     <div className="cd-page">
