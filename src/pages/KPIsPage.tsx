@@ -10,6 +10,7 @@ import { CdModal } from '../components/cadence/CdModal'
 import { Icon } from '../components/cadence/Icon'
 import { fmt, isOnTrack, makeTrend } from '../lib/cadenceUtils'
 import { createKPI, getAdminUnits, getUnitMembers } from '../services/kpis.service'
+import { getErrorMessage } from '../lib/errors'
 import type { KPI, Person } from '../types/cadence'
 import { EmptyState } from '../components/cadence/EmptyState'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -144,6 +145,7 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
   const [ownerId, setOwnerId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [roleName, setRoleName] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   // Load admin units on mount
   useEffect(() => {
@@ -168,7 +170,13 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
   }
 
   async function handleSave() {
-    if (!name.trim() || !ownerId || !unitId || !user?.id) return
+    setError(null)
+    if (!name.trim()) { setError('Name is required'); return }
+    if (!unitId || !ownerId) {
+      setError('You need to be an admin or lead of a unit (or a global admin) to add a KPI. Check Structure → Units if this seems wrong.')
+      return
+    }
+    if (!user?.id) return
     setSaving(true)
     try {
       await createKPI({
@@ -184,7 +192,11 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
       })
       onCreated()
       onClose()
-    } finally { setSaving(false) }
+    } catch (ex) {
+      setError(getErrorMessage(ex))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -248,6 +260,7 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
           <span className="cd-field-lbl">Role label (for grouping)</span>
           <input className="cd-um-input" value={roleName} onChange={e => setRoleName(e.target.value)} placeholder="e.g. Engineering Lead" />
         </label>
+        {error && <p className="cd-um-error">{error}</p>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button type="button" className="cd-btn" onClick={onClose}>Cancel</button>
           <button

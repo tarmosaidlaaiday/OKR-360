@@ -204,6 +204,20 @@ export async function createKPI(input: CreateKPIInput): Promise<string> {
 // ── Units (for Add KPI modal scope) ───────────────────────────────────────
 
 export async function getAdminUnits(userId: string) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_global_admin, org_id')
+    .eq('id', userId)
+    .single()
+
+  if (profile?.is_global_admin) {
+    const { data } = await supabase
+      .from('units')
+      .select('id, name')
+      .eq('org_id', profile.org_id)
+    return data ?? []
+  }
+
   const { data } = await supabase
     .from('people_units')
     .select('unit_id, unit:units(id, name)')
