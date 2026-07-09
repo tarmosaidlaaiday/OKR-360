@@ -108,6 +108,8 @@ export interface KPI {
   actual: number      // from latest kpi_snapshots.value
   cycle_id?: string | null
   unit_id?: string | null
+  key_result_id?: string | null
+  linked_kr_title?: string | null
   trend: number[]     // last 13 kpi_snapshots values
 }
 

@@ -3,6 +3,7 @@ import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
 import { useKrTasks } from '../hooks/useKrTasks'
+import { getKpisForKeyResult } from '../services/kpis.service'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -48,6 +49,7 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
   const { tasks, addTask, editTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
   const [people, setPeople] = useState<SlimProfile[]>([])
+  const [linkedKpis, setLinkedKpis] = useState<{ id: string; name: string; actual: number; unit: string }[]>([])
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('')
@@ -62,6 +64,10 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
     supabase.from('profiles').select('id, full_name, avatar_url, color').order('full_name')
       .then(({ data }) => setPeople((data ?? []) as SlimProfile[]))
   }, [])
+
+  useEffect(() => {
+    getKpisForKeyResult(kr.id).then(setLinkedKpis).catch(() => {})
+  }, [kr.id])
 
   function cycleStatus(task: KrTask) {
     const next: KrTaskStatus = task.status === 'todo' ? 'in_progress'
@@ -105,6 +111,14 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
         <div className="cd-okr-col-title">
           <span className="cd-okr-kr-indent" />
           <span className="cd-okr-kr-title">{kr.title}</span>
+          {linkedKpis.length > 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
+              <Icon name="chartLine" size={11} />
+              {linkedKpis.length === 1
+                ? `${linkedKpis[0].name}: ${fmt(linkedKpis[0].actual)}${linkedKpis[0].unit}`
+                : `${linkedKpis.length} KPIs linked`}
+            </span>
+          )}
         </div>
         <div className="cd-okr-col-supports" />
         <div className="cd-okr-col-owner">

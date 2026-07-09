@@ -38,7 +38,7 @@ export async function getKPIs(cycleId: string): Promise<KPI[]> {
   // 1. Fetch KPIs with owner profile
   const { data: rawKpis, error: kpiErr } = await supabase
     .from('kpis')
-    .select('id, name, unit, good, direction, role_name, owner_id, owner_person_id, cycle_id, unit_id, plan, actual')
+    .select('id, name, unit, good, direction, role_name, owner_id, owner_person_id, cycle_id, unit_id, plan, actual, key_result_id, linked_kr:key_results!key_result_id(id, title)')
     .order('role_name', { ascending: true })
   if (kpiErr) throw kpiErr
 
@@ -123,6 +123,8 @@ export async function getKPIs(cycleId: string): Promise<KPI[]> {
       actual,
       cycle_id: k.cycle_id ?? null,
       unit_id: k.unit_id ?? null,
+      key_result_id: k.key_result_id ?? null,
+      linked_kr_title: (k.linked_kr as any)?.title ?? null,
       trend: snapshotMap[k.id] ?? [],
     } satisfies KPI
   })
@@ -169,6 +171,7 @@ export interface CreateKPIInput {
   plan_value: number
   cycle_id: string
   created_by: string
+  key_result_id?: string | null
 }
 
 export async function createKPI(input: CreateKPIInput): Promise<string> {
@@ -187,6 +190,7 @@ export async function createKPI(input: CreateKPIInput): Promise<string> {
       actual: 0,
       cycle_id: input.cycle_id,
       created_by: input.created_by,
+      key_result_id: input.key_result_id ?? null,
     })
     .select('id')
     .single()
@@ -232,6 +236,17 @@ export async function getUnitMembers(unitId: string): Promise<Person[]> {
     .select('person:profiles!person_id(id, full_name, avatar_url, color, job_title)')
     .eq('unit_id', unitId)
   return ((data ?? []) as any[]).map((m: any) => profileToPerson(m.person)).filter(Boolean)
+}
+
+// ── KPIs linked to a specific Key Result ─────────────────────────────────
+
+export async function getKpisForKeyResult(keyResultId: string): Promise<{ id: string; name: string; actual: number; unit: string }[]> {
+  const { data, error } = await supabase
+    .from('kpis')
+    .select('id, name, actual, unit')
+    .eq('key_result_id', keyResultId)
+  if (error) throw error
+  return (data ?? []) as any[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
