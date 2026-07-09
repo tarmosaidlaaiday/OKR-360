@@ -95,6 +95,7 @@ function KrCard({ kr, draft, onChange }: {
               className="cd-checkin-value-input"
               value={draft.new_value}
               onChange={e => onChange({ new_value: parseFloat(e.target.value) || 0 })}
+              onFocus={e => e.target.select()}
               step="any"
             />
             {kr.unit && <span className="cd-checkin-unit">{kr.unit}</span>}
