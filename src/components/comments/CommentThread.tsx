@@ -6,6 +6,7 @@ import type { Comment } from '../../types'
 interface CommentThreadProps {
   objectiveId?: string
   krId?: string
+  kpiId?: string
 }
 
 function timeAgo(iso: string): string {
@@ -28,7 +29,7 @@ function Initials({ name }: { name: string }) {
   )
 }
 
-export function CommentThread({ objectiveId, krId }: CommentThreadProps) {
+export function CommentThread({ objectiveId, krId, kpiId }: CommentThreadProps) {
   const { user } = useAuth()
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,13 +42,15 @@ export function CommentThread({ objectiveId, krId }: CommentThreadProps) {
     setLoading(true)
     const fetch = objectiveId
       ? commentsService.getByObjective(objectiveId)
-      : commentsService.getByKR(krId!)
+      : kpiId
+        ? commentsService.getByKPI(kpiId)
+        : commentsService.getByKR(krId!)
     fetch
       .then(data => { if (active) setComments(data) })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [objectiveId, krId])
+  }, [objectiveId, krId, kpiId])
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault()
@@ -58,7 +61,7 @@ export function CommentThread({ objectiveId, krId }: CommentThreadProps) {
       const comment = await commentsService.create({
         body: text,
         author_id: user.id,
-        ...(objectiveId ? { objective_id: objectiveId } : { key_result_id: krId }),
+        ...(objectiveId ? { objective_id: objectiveId } : kpiId ? { kpi_id: kpiId } : { key_result_id: krId }),
       })
       setComments(prev => [...prev, comment])
       setBody('')

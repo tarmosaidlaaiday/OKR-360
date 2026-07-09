@@ -124,6 +124,7 @@ export interface Comment {
   author_id: string
   objective_id: string | null
   key_result_id: string | null
+  kpi_id: string | null
   body: string
   created_at: string
   updated_at: string
