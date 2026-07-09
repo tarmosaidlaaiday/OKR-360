@@ -11,6 +11,9 @@ import { Icon } from '../components/cadence/Icon'
 import { fmt, isOnTrack, makeTrend } from '../lib/cadenceUtils'
 import { createKPI, getAdminUnits, getUnitMembers } from '../services/kpis.service'
 import { getErrorMessage } from '../lib/errors'
+import { commentsService } from '../services/comments.service'
+import { CommentThread } from '../components/comments/CommentThread'
+import { supabase } from '../lib/supabase'
 import type { KPI, Person } from '../types/cadence'
 import { EmptyState } from '../components/cadence/EmptyState'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -37,6 +40,7 @@ function ActualCell({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<
   const [editing, setEditing] = useState(false)
   const [val, setVal] = useState(String(kpi.actual))
   const [flash, setFlash] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function startEdit() {
@@ -73,12 +77,22 @@ function ActualCell({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<
   return (
     <span
       className="cd-num cd-kpi-actual-val"
-      title="Click to update"
+      title="Click to update actual value"
       onClick={startEdit}
-      style={{ cursor: 'pointer', borderBottom: '1px dashed var(--ink-faint)' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        cursor: 'pointer',
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        borderBottom: `1px dashed ${hovered ? 'var(--accent)' : 'var(--ink-faint)'}`,
+        color: hovered ? 'var(--accent)' : undefined,
+      }}
     >
       {fmt(kpi.actual)}
-      {flash && <span style={{ marginLeft: 4, fontSize: 11, color: 'var(--ok)', fontWeight: 500 }}>✓</span>}
+      {flash
+        ? <span style={{ fontSize: 11, color: 'var(--ok)', fontWeight: 500 }}>✓</span>
+        : hovered && <span style={{ opacity: 0.6 }}><Icon name="pencil" size={10} /></span>
+      }
     </span>
   )
 }
@@ -88,41 +102,79 @@ function ActualCell({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<
 function KPIRow({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<void> }) {
   const ok = isOnTrack(kpi)
   const trend = kpi.trend.length >= 3 ? kpi.trend : makeTrend(kpi)
+  const [commentCount, setCommentCount] = useState<number | null>(null)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+
+  useEffect(() => {
+    commentsService.getByKPI(kpi.id)
+      .then(c => setCommentCount(c.length))
+      .catch(() => {})
+  }, [kpi.id])
+
   return (
-    <div className="cd-kpi-row">
-      <span className="cd-kpi-name">
-        <span className={'cd-dot ' + (ok ? 'is-ok' : 'is-bad')} />
-        {kpi.name}
-      </span>
-      <span className="cd-kpi-owner">
-        <Avatar person={kpi.owner ?? null} size={22} />
-      </span>
-      <span className="cd-num-col">
-        <span className="cd-num">{fmt(kpi.plan)}</span>
-        {kpi.unit && <span className="cd-unit">{kpi.unit}</span>}
-      </span>
-      <span className="cd-num-col">
-        <span className="cd-num-faint">{fmt(kpi.plan_to_date)}</span>
-      </span>
-      <span className="cd-num-col">
-        <ActualCell kpi={kpi} onSave={onSave} />
-      </span>
-      <span className="cd-num-col">
-        <KpiDeltaChip
-          actual={kpi.actual}
-          planToDate={kpi.plan_to_date}
-          good={kpi.good ?? kpi.direction}
-          unit={kpi.unit}
-        />
-      </span>
-      <span className="cd-kpi-trend">
-        <Sparkline
-          values={trend}
-          stroke={ok ? 'var(--ok)' : 'var(--bad)'}
-          width={120}
-          height={28}
-        />
-      </span>
+    <div>
+      <div className="cd-kpi-row">
+        <span className="cd-kpi-name">
+          <span className={'cd-dot ' + (ok ? 'is-ok' : 'is-bad')} />
+          <span style={{ flex: 1, minWidth: 0 }}>
+            {kpi.name}
+            {kpi.linked_kr_title && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', fontWeight: 400 }}>
+                <Icon name="target" size={10} />
+                <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {kpi.linked_kr_title}
+                </span>
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="cd-kpi-owner">
+          <Avatar person={kpi.owner ?? null} size={22} />
+        </span>
+        <span className="cd-num-col">
+          <span className="cd-num">{fmt(kpi.plan)}</span>
+          {kpi.unit && <span className="cd-unit">{kpi.unit}</span>}
+        </span>
+        <span className="cd-num-col">
+          <span className="cd-num-faint">{fmt(kpi.plan_to_date)}</span>
+        </span>
+        <span className="cd-num-col">
+          <ActualCell kpi={kpi} onSave={onSave} />
+        </span>
+        <span className="cd-num-col">
+          <KpiDeltaChip
+            actual={kpi.actual}
+            planToDate={kpi.plan_to_date}
+            good={kpi.good ?? kpi.direction}
+            unit={kpi.unit}
+          />
+        </span>
+        <span className="cd-kpi-trend" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Sparkline
+            values={trend}
+            stroke={ok ? 'var(--ok)' : 'var(--bad)'}
+            width={120}
+            height={28}
+          />
+          <button
+            type="button"
+            className="cd-btn-icon"
+            title="Comments"
+            onClick={() => setCommentsOpen(v => !v)}
+            style={{ color: commentsOpen ? 'var(--accent)' : 'var(--ink-faint)', flexShrink: 0 }}
+          >
+            <Icon name="chat" size={14} />
+            {commentCount != null && commentCount > 0 && (
+              <span style={{ fontSize: 10, marginLeft: 2 }}>{commentCount}</span>
+            )}
+          </button>
+        </span>
+      </div>
+      {commentsOpen && (
+        <div style={{ padding: '0 16px 12px', borderTop: '1px solid var(--line)' }}>
+          <CommentThread kpiId={kpi.id} />
+        </div>
+      )}
     </div>
   )
 }
@@ -146,6 +198,27 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
   const [saving, setSaving] = useState(false)
   const [roleName, setRoleName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [krOpts, setKrOpts] = useState<{ id: string; title: string; obj_title: string }[]>([])
+  const [linkedKrId, setLinkedKrId] = useState<string>('')
+
+  // Load KRs for this cycle (for the optional link)
+  useEffect(() => {
+    if (!cycleId) return
+    supabase
+      .from('objectives')
+      .select('id, title, key_results(id, title)')
+      .eq('cycle_id', cycleId)
+      .order('title')
+      .then(({ data }) => {
+        const opts: { id: string; title: string; obj_title: string }[] = []
+        for (const obj of (data ?? []) as any[]) {
+          for (const kr of (obj.key_results ?? [])) {
+            opts.push({ id: kr.id, title: kr.title, obj_title: obj.title })
+          }
+        }
+        setKrOpts(opts)
+      })
+  }, [cycleId])
 
   // Load admin units on mount
   useEffect(() => {
@@ -189,6 +262,7 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
         plan_value: parseFloat(planValue) || 0,
         cycle_id: cycleId,
         created_by: user.id,
+        key_result_id: linkedKrId || null,
       })
       onCreated()
       onClose()
@@ -260,6 +334,19 @@ function AddKPIModal({ onClose, onCreated, cycleId }: {
           <span className="cd-field-lbl">Role label (for grouping)</span>
           <input className="cd-um-input" value={roleName} onChange={e => setRoleName(e.target.value)} placeholder="e.g. Engineering Lead" />
         </label>
+        {krOpts.length > 0 && (
+          <label className="cd-field">
+            <span className="cd-field-lbl">Link to Key Result <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span></span>
+            <select className="cd-um-select" value={linkedKrId} onChange={e => setLinkedKrId(e.target.value)}>
+              <option value="">No linked key result</option>
+              {krOpts.map(kr => (
+                <option key={kr.id} value={kr.id}>
+                  {kr.title} ({kr.obj_title})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {error && <p className="cd-um-error">{error}</p>}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button type="button" className="cd-btn" onClick={onClose}>Cancel</button>
