@@ -138,7 +138,7 @@ function KrDraftCard({
 
 // ── Form ──────────────────────────────────────────────────────────────────
 
-interface ObjOption { id: string; title: string }
+interface ObjOption { id: string; title: string; level_name: string | null }
 interface UnitOption { id: string; name: string }
 
 interface ObjectiveFormProps {
@@ -191,11 +191,13 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     if (!cycleId) { setParentOpts([]); return }
     supabase
       .from('objectives')
-      .select('id, title')
+      .select('id, title, level:levels(name)')
       .eq('cycle_id', cycleId)
       .order('title')
       .then(({ data }) => {
-        const opts = ((data ?? []) as ObjOption[]).filter(o => o.id !== objective?.id)
+        const opts = ((data ?? []) as any[])
+          .filter((o: any) => o.id !== objective?.id)
+          .map((o: any) => ({ id: o.id, title: o.title, level_name: o.level?.name ?? null }))
         setParentOpts(opts)
       })
   }, [cycleId, objective?.id])
@@ -473,7 +475,9 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
             >
               <option value="">No parent (top-level)</option>
               {parentOpts.map(o => (
-                <option key={o.id} value={o.id}>{o.title}</option>
+                <option key={o.id} value={o.id}>
+                  {o.level_name ? `${o.title} (${o.level_name})` : o.title}
+                </option>
               ))}
             </select>
           </label>
