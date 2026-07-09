@@ -494,7 +494,7 @@ export function ScorecardPage() {
                         <div key={o.id} className="cd-sc-obj">
                           <ConfidenceCell value={conf} size={28} />
                           <div className="cd-sc-obj-title">{o.title}</div>
-                          <div className="cd-sc-obj-team">{o.team?.name ?? '—'}</div>
+                          <div className="cd-sc-obj-team">{o.unit?.name ?? '—'}</div>
                           <Sparkline
                             values={objSparkline(o)}
                             width={100}

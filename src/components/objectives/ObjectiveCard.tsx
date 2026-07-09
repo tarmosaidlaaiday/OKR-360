@@ -69,9 +69,9 @@ export function ObjectiveCard({ objective, onEdit, onDelete, onKeyResultAdded }:
                 <span className="text-xs text-gray-500">{objective.owner.full_name}</span>
               </div>
             )}
-            {objective.team && (
+            {objective.unit && (
               <span className="text-xs text-gray-400 bg-gray-50 rounded-full px-2 py-0.5 ring-1 ring-gray-200">
-                {objective.team.name}
+                {objective.unit.name}
               </span>
             )}
           </div>

@@ -3,7 +3,7 @@ import { objectivesService } from '../services/objectives.service'
 import type { Objective, CreateObjectiveInput, UpdateObjectiveInput } from '../types'
 import { useAuth } from '../context/AuthContext'
 
-export function useObjectives(cycleId: string | null, teamId?: string | null) {
+export function useObjectives(cycleId: string | null, unitId?: string | null) {
   const [objectives, setObjectives] = useState<Objective[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -13,14 +13,14 @@ export function useObjectives(cycleId: string | null, teamId?: string | null) {
     setLoading(true)
     setError(null)
     try {
-      const data = await objectivesService.getByCycle(cycleId, teamId)
+      const data = await objectivesService.getByCycle(cycleId, unitId)
       setObjectives(data)
     } catch (e) {
       setError(e as Error)
     } finally {
       setLoading(false)
     }
-  }, [cycleId, teamId])
+  }, [cycleId, unitId])
 
   useEffect(() => { fetch() }, [fetch])
 

@@ -89,7 +89,7 @@ function ObjectiveRow({
       </div>
       <div className="cd-obj-body">
         <div className="cd-obj-team">
-          <Icon name="grid" size={11} /> {(o.team as any)?.name ?? 'No team'}
+          <Icon name="grid" size={11} /> {o.unit?.name ?? 'No unit'}
         </div>
         <div className="cd-obj-title">{o.title}</div>
         <div className="cd-obj-krs">

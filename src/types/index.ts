@@ -71,7 +71,7 @@ export interface Objective {
   updated_at: string
   // joined
   owner?: Profile
-  team?: Team | null
+  unit?: { id: string; name: string; color?: string } | null
   key_results?: KeyResult[]
 }
 

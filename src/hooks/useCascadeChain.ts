@@ -8,8 +8,9 @@ async function fetchObjective(id: string): Promise<CadenceObjective | null> {
     .from('objectives')
     .select(`
       id, title, status, cycle_id, owner_id,
-      team_id, level_id, parent_objective_id,
+      unit_id, level_id, parent_objective_id,
       owner:profiles!owner_id(id, full_name, avatar_url, color, role),
+      unit:units(id, name, color),
       level:levels(id, name, depth, color),
       parent_objective:objectives!parent_objective_id(id, title),
       key_results(id, title, target_type, start_value, target_value, current_value, unit, owner_id, confidence)
@@ -29,7 +30,6 @@ async function fetchObjective(id: string): Promise<CadenceObjective | null> {
     confidence: [],
     progress: objectiveProgress(krs),
     description: null,
-    team: null,
     parent_objective: data.parent_objective ?? null,
   } as CadenceObjective
 }

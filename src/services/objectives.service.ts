@@ -1,22 +1,34 @@
 import { supabase } from '../lib/supabase'
 import type { Objective, CreateObjectiveInput, UpdateObjectiveInput } from '../types'
+import type { CadenceObjective } from '../types/cadence'
 
 const SELECT_OBJECTIVE = `
-  id, title, description, owner_id, team_id, cycle_id, status, created_at, updated_at,
+  id, title, description, owner_id, unit_id, cycle_id, status, created_at, updated_at,
   owner:profiles(id, full_name, avatar_url, team_id),
-  team:teams(id, name),
+  unit:units(id, name, color),
   key_results(id, objective_id, title, target_type, current_value, target_value, unit, created_at, updated_at)
 `
 
+// Shared cadence SELECT (used by cadence-aware functions)
+const SELECT_CADENCE = `
+  id, title, status, cycle_id, owner_id,
+  unit_id, level_id, parent_objective_id,
+  owner:profiles!owner_id(id, full_name, avatar_url, color, role),
+  unit:units(id, name, color),
+  level:levels(id, name, depth, color),
+  parent_objective:objectives!parent_objective_id(id, title),
+  key_results(id, title, target_type, start_value, target_value, current_value, unit, owner_id, confidence)
+`
+
 export const objectivesService = {
-  async getByCycle(cycleId: string, teamId?: string | null): Promise<Objective[]> {
+  async getByCycle(cycleId: string, unitId?: string | null): Promise<Objective[]> {
     let query = supabase
       .from('objectives')
       .select(SELECT_OBJECTIVE)
       .eq('cycle_id', cycleId)
       .order('created_at', { ascending: false })
 
-    if (teamId) query = query.eq('team_id', teamId)
+    if (unitId) query = query.eq('unit_id', unitId)
 
     const { data, error } = await query
     if (error) throw error
@@ -73,4 +85,14 @@ export const objectivesService = {
     const { error } = await supabase.from('objectives').delete().eq('id', id)
     if (error) throw error
   },
+}
+
+export async function getChildObjectives(objectiveId: string): Promise<CadenceObjective[]> {
+  const { data, error } = await supabase
+    .from('objectives')
+    .select(SELECT_CADENCE)
+    .eq('parent_objective_id', objectiveId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as unknown as CadenceObjective[]
 }
