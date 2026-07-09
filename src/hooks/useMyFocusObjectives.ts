@@ -21,7 +21,7 @@ export function useMyFocusObjectives(cycleId: string | null, userId: string | nu
           id, title, status, cycle_id, owner_id,
           unit_id, level_id, parent_objective_id,
           owner:profiles!owner_id(id, full_name, avatar_url, color, role),
-          unit:units(id, name, color),
+          unit:units(id, name),
           level:levels(id, name, depth, color),
           parent_objective:objectives!parent_objective_id(id, title),
           key_results(id, title, target_type, start_value, target_value, current_value, unit, owner_id, confidence)

@@ -79,7 +79,7 @@ export interface CadenceObjective {
   owner_id: string
   owner?: Person | null
   unit_id: string | null
-  unit?: { id: string; name: string; color: string } | null
+  unit?: { id: string; name: string } | null
   cycle_id: string
   status: string
   // Cascade fields
