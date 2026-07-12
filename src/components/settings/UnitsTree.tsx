@@ -425,23 +425,38 @@ interface OrgTemplatesProps {
 
 function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
   const enabledLevels = levels.filter(l => l.enabled)
-  const topLevel = enabledLevels[0] ?? null
-  const secondLevel = enabledLevels[1] ?? null
+
+  // Match by name for the default hierarchy (Group → Company → Division → Team).
+  // Fall back gracefully if levels have been renamed or the org has fewer tiers.
+  const norm = (s: string) => s.trim().toLowerCase()
+  const companyLevel =
+    enabledLevels.find(l => norm(l.name) === 'company') ??
+    enabledLevels[Math.min(1, enabledLevels.length - 1)] ??
+    null
+
+  const teamLevel =
+    enabledLevels.find(l => norm(l.name) === 'team') ??
+    enabledLevels[enabledLevels.length - 1] ??
+    null
+
+  // If both resolve to the same level (e.g. only one level exists), root and
+  // children share a level — not ideal but not a silent wrong-level mismatch.
+  const childLevelId = teamLevel?.id ?? companyLevel?.id ?? null
 
   function makeCompanyPlusTeams() {
     const companyId = uid()
-    const company: Unit = { id: companyId, name: 'Company', level_id: topLevel?.id ?? null, parent_id: null, position: 0 }
+    const company: Unit = { id: companyId, name: 'Company', level_id: companyLevel?.id ?? null, parent_id: null, position: 0 }
     const teams = ['Team 1', 'Team 2', 'Team 3'].map((name, i) => ({
-      id: uid(), name, level_id: secondLevel?.id ?? topLevel?.id ?? null, parent_id: companyId, position: i,
+      id: uid(), name, level_id: childLevelId, parent_id: companyId, position: i,
     }))
     onApply([company, ...teams])
   }
 
   function makeDepartments() {
     const companyId = uid()
-    const company: Unit = { id: companyId, name: 'Company', level_id: topLevel?.id ?? null, parent_id: null, position: 0 }
+    const company: Unit = { id: companyId, name: 'Company', level_id: companyLevel?.id ?? null, parent_id: null, position: 0 }
     const depts = ['Sales', 'Marketing', 'Engineering', 'Operations'].map((name, i) => ({
-      id: uid(), name, level_id: secondLevel?.id ?? topLevel?.id ?? null, parent_id: companyId, position: i,
+      id: uid(), name, level_id: childLevelId, parent_id: companyId, position: i,
     }))
     onApply([company, ...depts])
   }
