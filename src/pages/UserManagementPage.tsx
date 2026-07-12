@@ -127,6 +127,7 @@ function CreateUserForm({
   isGlobalAdmin,
   allowedRoles,
   orgId,
+  defaultUnitId,
   onCreate,
   onInvite,
   onCancel,
@@ -136,14 +137,22 @@ function CreateUserForm({
   isGlobalAdmin: boolean
   allowedRoles: UnitRole[]
   orgId: string | null
+  defaultUnitId?: string
   onCreate: (p: { name: string; email: string; password: string; unit_id: string; role: UnitRole; must_change_password: boolean }) => Promise<void>
   onInvite: (p: { full_name: string; email: string; unit_id: string; role: UnitRole; org_id: string }) => Promise<void>
   onCancel: () => void
 }) {
+  const { setInviteForUnitId } = usePageActionStore()
   const [manualMode, setManualMode] = useState(false)
   const [form, setForm] = useState({
-    name: '', email: '', password: '', unit_id: '', role: 'member' as UnitRole, must_change_password: true,
+    name: '', email: '', password: '', unit_id: defaultUnitId ?? '', role: 'member' as UnitRole, must_change_password: true,
   })
+
+  // Clear the pre-fill from the store once consumed
+  useEffect(() => {
+    return () => { setInviteForUnitId(null) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -361,7 +370,7 @@ function UserList({
   const [tab, setTab] = useState<FilterTab>('all')
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const { addUserOpen, setAddUserOpen } = usePageActionStore()
+  const { addUserOpen, setAddUserOpen, inviteForUnitId } = usePageActionStore()
 
   useEffect(() => {
     if (addUserOpen) {
@@ -416,6 +425,7 @@ function UserList({
           isGlobalAdmin={isGlobalAdmin}
           allowedRoles={allowedRoles}
           orgId={orgId}
+          defaultUnitId={inviteForUnitId ?? undefined}
           onCreate={async payload => { await onCreate(payload); setShowCreate(false) }}
           onInvite={async payload => { await onInvite(payload); setShowCreate(false) }}
           onCancel={() => setShowCreate(false)}
