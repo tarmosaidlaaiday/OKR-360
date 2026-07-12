@@ -173,8 +173,9 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   const [aiError, setAiError]           = useState('')
   const [tplOpen, setTplOpen]           = useState(false)
 
-  // Guardrail KPIs (edit mode only)
+  // Guardrail KPIs — edit: persisted immediately; create: staged until objective is saved
   const [guardrails, setGuardrails]     = useState<GuardrailKpi[]>([])
+  const [stagedGuardrailIds, setStagedGuardrailIds] = useState<Set<string>>(new Set())
   const [kpiOpts, setKpiOpts]           = useState<{ id: string; name: string; unit: string; role_name: string }[]>([])
   const [addingGuardrail, setAddingGuardrail] = useState(false)
 
@@ -198,11 +199,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     }
   }, [open, refresh, isEdit, objective?.id])
 
-  // Load KPI options for guardrail picker when cycleId is set
+  // Load KPI options for guardrail picker whenever cycle is known (create or edit)
   useEffect(() => {
-    if (!isEdit || !cycleId) return
+    if (!cycleId) return
     getKpisForGuardrailPicker(cycleId).then(setKpiOpts).catch(() => {})
-  }, [isEdit, cycleId])
+  }, [cycleId])
 
   // Re-fetch parent objectives whenever the selected cycle changes
   useEffect(() => {
@@ -308,12 +309,20 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         )
       }
 
+      // Commit staged guardrails on create (mirrors how KRs are attached after objective creation)
+      if (!isEdit && typeof objectiveId === 'string' && stagedGuardrailIds.size > 0 && user?.id) {
+        await Promise.all(
+          [...stagedGuardrailIds].map(kpiId => addGuardrailKpi(objectiveId, kpiId, user.id!))
+        )
+      }
+
       onClose()
       if (!isEdit) {
         setTitle(''); setDescription('')
         setCycleId(activeCycle?.id ?? '')
         setUnitId(''); setParentId(''); setStatus('on_track')
         setKrs([]); setAiError('')
+        setStagedGuardrailIds(new Set())
       }
     } catch (ex) {
       setError(getErrorMessage(ex))
@@ -501,31 +510,52 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
           </label>
         )}
 
-        {/* Guardrail KPIs (edit mode only — needs objective ID) */}
-        {isEdit && (
+        {/* Guardrail KPIs — available in both create and edit mode */}
+        {kpiOpts.length > 0 && (
           <div className="cd-field">
             <span className="cd-field-lbl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <Icon name="shield" size={13} />
               Guardrail KPIs <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span>
             </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-              {guardrails.map(g => (
-                <span key={g.id} className="cd-guardrail-tag">
-                  {g.name}
-                  <button
-                    type="button"
-                    className="cd-btn-icon"
-                    style={{ marginLeft: 2, fontSize: 11 }}
-                    onClick={async () => {
-                      await removeGuardrailKpi(g.id)
-                      setGuardrails(prev => prev.filter(x => x.id !== g.id))
-                    }}
-                    title="Remove guardrail"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+              {isEdit
+                ? /* Edit mode: persisted guardrails with immediate remove */
+                  guardrails.map(g => (
+                    <span key={g.id} className="cd-guardrail-tag">
+                      {g.name}
+                      <button
+                        type="button"
+                        className="cd-btn-icon"
+                        style={{ marginLeft: 2, fontSize: 11 }}
+                        onClick={async () => {
+                          await removeGuardrailKpi(g.id)
+                          setGuardrails(prev => prev.filter(x => x.id !== g.id))
+                        }}
+                        title="Remove guardrail"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                : /* Create mode: staged IDs removed from local set on × click */
+                  [...stagedGuardrailIds].map(kpiId => {
+                    const kpi = kpiOpts.find(k => k.id === kpiId)
+                    return (
+                      <span key={kpiId} className="cd-guardrail-tag">
+                        {kpi?.name ?? kpiId}
+                        <button
+                          type="button"
+                          className="cd-btn-icon"
+                          style={{ marginLeft: 2, fontSize: 11 }}
+                          onClick={() => setStagedGuardrailIds(prev => { const s = new Set(prev); s.delete(kpiId); return s })}
+                          title="Remove guardrail"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    )
+                  })
+              }
               {addingGuardrail ? (
                 <select
                   className="cd-um-select"
@@ -534,17 +564,25 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
                   defaultValue=""
                   onChange={async e => {
                     const kpiId = e.target.value
-                    if (!kpiId || !objective?.id || !user?.id) return
+                    if (!kpiId) return
                     setAddingGuardrail(false)
-                    await addGuardrailKpi(objective.id, kpiId, user.id)
-                    const updated = await getGuardrailKpis(objective.id)
-                    setGuardrails(updated)
+                    if (isEdit && objective?.id && user?.id) {
+                      await addGuardrailKpi(objective.id, kpiId, user.id)
+                      const updated = await getGuardrailKpis(objective.id)
+                      setGuardrails(updated)
+                    } else {
+                      setStagedGuardrailIds(prev => new Set(prev).add(kpiId))
+                    }
                   }}
                   onBlur={() => setAddingGuardrail(false)}
                 >
                   <option value="">Select a KPI…</option>
                   {kpiOpts
-                    .filter(k => !guardrails.some(g => g.kpi_id === k.id))
+                    .filter(k =>
+                      isEdit
+                        ? !guardrails.some(g => g.kpi_id === k.id)
+                        : !stagedGuardrailIds.has(k.id)
+                    )
                     .map(k => (
                       <option key={k.id} value={k.id}>
                         {k.name}{k.role_name ? ` (${k.role_name})` : ''}
