@@ -38,7 +38,7 @@ export async function getKPIs(cycleId: string): Promise<KPI[]> {
   // 1. Fetch KPIs with owner profile
   const { data: rawKpis, error: kpiErr } = await supabase
     .from('kpis')
-    .select('id, name, unit, good, direction, role_name, owner_id, owner_person_id, cycle_id, unit_id, plan, actual, key_result_id, linked_kr:key_results!key_result_id(id, title)')
+    .select('id, name, unit, good, direction, role_name, owner_id, owner_person_id, cycle_id, unit_id, plan, actual, key_result_id, linked_kr:key_results!key_result_id(id, title, objective_id)')
     .order('role_name', { ascending: true })
   if (kpiErr) throw kpiErr
 
@@ -125,6 +125,7 @@ export async function getKPIs(cycleId: string): Promise<KPI[]> {
       unit_id: k.unit_id ?? null,
       key_result_id: k.key_result_id ?? null,
       linked_kr_title: (k.linked_kr as any)?.title ?? null,
+      linked_objective_id: (k.linked_kr as any)?.objective_id ?? null,
       trend: snapshotMap[k.id] ?? [],
     } satisfies KPI
   })
@@ -240,13 +241,29 @@ export async function getUnitMembers(unitId: string): Promise<Person[]> {
 
 // ── KPIs linked to a specific Key Result ─────────────────────────────────
 
-export async function getKpisForKeyResult(keyResultId: string): Promise<{ id: string; name: string; actual: number; unit: string }[]> {
+export interface LinkedKpiSummary {
+  id: string
+  name: string
+  actual: number
+  plan: number
+  unit: string
+  good: 'up' | 'down'
+}
+
+export async function getKpisForKeyResult(keyResultId: string): Promise<LinkedKpiSummary[]> {
   const { data, error } = await supabase
     .from('kpis')
-    .select('id, name, actual, unit')
+    .select('id, name, actual, unit, plan, good, direction')
     .eq('key_result_id', keyResultId)
   if (error) throw error
-  return (data ?? []) as any[]
+  return ((data ?? []) as any[]).map((k: any) => ({
+    id: k.id,
+    name: k.name,
+    actual: k.actual ?? 0,
+    plan: k.plan ?? 0,
+    unit: k.unit ?? '',
+    good: (k.good ?? k.direction ?? 'up') as 'up' | 'down',
+  }))
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────

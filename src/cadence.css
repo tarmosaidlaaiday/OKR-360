@@ -4633,3 +4633,127 @@ kbd.cd-kbd {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
+
+/* ── KPI link chip (KR → KPI, shown in My Focus) ────────────────────────── */
+
+.cd-kpi-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  border: none;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  background: var(--bg-sub);
+  color: var(--ink-soft);
+  transition: background 120ms;
+}
+.cd-kpi-link-chip:hover { background: var(--line); }
+.cd-kpi-link-chip--ok   { border-left-color: var(--ok); }
+.cd-kpi-link-chip--warn { border-left-color: var(--warn, #f59e0b); }
+.cd-kpi-link-chip--bad  { border-left-color: var(--bad); }
+.cd-kpi-link-chip-name  { font-weight: 500; }
+.cd-kpi-link-chip-val   { color: var(--ink-faint); margin-left: 2px; }
+
+/* ── KR link chip (KPI → KR, shown in KPIs page) ────────────────────────── */
+
+.cd-kr-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-sub);
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+  vertical-align: middle;
+}
+.cd-kr-link-chip:hover { border-color: var(--accent); color: var(--accent); }
+.cd-kr-link-chip-title {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Guardrail chips (objective row in My Focus) ─────────────────────────── */
+
+.cd-guardrail-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 48px;
+  background: color-mix(in oklab, var(--accent) 4%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.cd-guardrail-label {
+  font-size: 11px;
+  color: var(--ink-faint);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.cd-guardrail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cd-guardrail-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 4px;
+  border: none;
+  border-left: 3px solid transparent;
+  background: var(--bg-sub);
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  transition: background 120ms;
+}
+.cd-guardrail-chip:hover   { background: var(--line); }
+.cd-guardrail-chip--ok     { border-left-color: var(--ok); }
+.cd-guardrail-chip--warn   { border-left-color: var(--warn, #f59e0b); }
+.cd-guardrail-chip--bad    { border-left-color: var(--bad); }
+.cd-guardrail-chip-name    { font-weight: 500; }
+.cd-guardrail-chip-val     { color: var(--ink-faint); }
+.cd-guardrail-chip-warn    { color: var(--bad); font-weight: 700; }
+
+/* ── Guardrail tag in ObjectiveForm ─────────────────────────────────────── */
+
+.cd-guardrail-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+/* ── Highlight flash animation ───────────────────────────────────────────── */
+
+@keyframes cd-highlight-flash {
+  0%   { background: color-mix(in oklab, var(--accent) 18%, transparent); }
+  100% { background: transparent; }
+}
+.cd-highlight-flash {
+  animation: cd-highlight-flash 1.5s ease-out forwards;
+  border-radius: 4px;
+}

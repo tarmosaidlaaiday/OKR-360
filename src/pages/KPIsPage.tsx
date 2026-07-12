@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { usePageActionStore } from '../stores/pageActionStore'
 import { useAuth } from '../context/AuthContext'
 import { useCycle } from '../context/CycleContext'
@@ -99,11 +100,13 @@ function ActualCell({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<
 
 // ── KPI row ───────────────────────────────────────────────────────────────
 
-function KPIRow({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<void> }) {
+function KPIRow({ kpi, onSave, highlighted }: { kpi: KPI; onSave: (v: number) => Promise<void>; highlighted?: boolean }) {
+  const navigate = useNavigate()
   const ok = isOnTrack(kpi)
   const trend = kpi.trend.length >= 3 ? kpi.trend : makeTrend(kpi)
   const [commentCount, setCommentCount] = useState<number | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const rowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     commentsService.getByKPI(kpi.id)
@@ -111,20 +114,33 @@ function KPIRow({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<void
       .catch(() => {})
   }, [kpi.id])
 
+  useEffect(() => {
+    if (highlighted && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      rowRef.current.classList.add('cd-highlight-flash')
+      const t = setTimeout(() => rowRef.current?.classList.remove('cd-highlight-flash'), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [highlighted])
+
   return (
-    <div>
+    <div ref={rowRef}>
       <div className="cd-kpi-row">
         <span className="cd-kpi-name">
           <span className={'cd-dot ' + (ok ? 'is-ok' : 'is-bad')} />
           <span style={{ flex: 1, minWidth: 0 }}>
             {kpi.name}
             {kpi.linked_kr_title && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', fontWeight: 400 }}>
+              <button
+                type="button"
+                className="cd-kr-link-chip"
+                onClick={() => kpi.linked_objective_id && navigate(`/focus?highlight=${kpi.linked_objective_id}`)}
+                title={kpi.linked_objective_id ? 'Go to KR in My Focus' : kpi.linked_kr_title}
+                style={{ cursor: kpi.linked_objective_id ? 'pointer' : 'default' }}
+              >
                 <Icon name="target" size={10} />
-                <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {kpi.linked_kr_title}
-                </span>
-              </span>
+                <span className="cd-kr-link-chip-title">{kpi.linked_kr_title}</span>
+              </button>
             )}
           </span>
         </span>
@@ -375,6 +391,8 @@ export function KPIsPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>('role')
   const [addOpen, setAddOpen] = useState(false)
   const { kpiModalOpen, setKpiModalOpen } = usePageActionStore()
+  const [searchParams] = useSearchParams()
+  const highlight = searchParams.get('highlight')
 
   useEffect(() => {
     if (kpiModalOpen) {
@@ -494,6 +512,7 @@ export function KPIsPage() {
                   key={k.id}
                   kpi={k}
                   onSave={v => updateActual(k.id, v)}
+                  highlighted={highlight === k.id}
                 />
               ))}
             </div>

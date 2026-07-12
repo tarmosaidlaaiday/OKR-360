@@ -4,12 +4,15 @@ import { CdModal } from '../cadence/CdModal'
 import { Icon } from '../cadence/Icon'
 import { TemplatePicker } from './TemplatePicker'
 import { useCycle } from '../../context/CycleContext'
+import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { keyResultsService } from '../../services/keyResults.service'
 import { suggestKRs } from '../../services/aiSuggestions.service'
+import { getGuardrailKpis, addGuardrailKpi, removeGuardrailKpi, getKpisForGuardrailPicker } from '../../services/guardrails.service'
 import type { OKRTemplate } from '../../data/okrTemplates'
 import type { Objective, CreateObjectiveInput, ObjectiveStatus } from '../../types'
 import type { KrTargetType } from '../../types'
+import type { GuardrailKpi } from '../../types/cadence'
 
 const STATUS_OPTIONS: { value: ObjectiveStatus; label: string }[] = [
   { value: 'on_track',  label: 'On Track'  },
@@ -150,6 +153,7 @@ interface ObjectiveFormProps {
 
 export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveFormProps) {
   const { activeCycle, cycles, refresh } = useCycle()
+  const { user } = useAuth()
   const isEdit = !!objective
 
   const [title, setTitle]               = useState(objective?.title ?? '')
@@ -169,6 +173,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   const [aiError, setAiError]           = useState('')
   const [tplOpen, setTplOpen]           = useState(false)
 
+  // Guardrail KPIs (edit mode only)
+  const [guardrails, setGuardrails]     = useState<GuardrailKpi[]>([])
+  const [kpiOpts, setKpiOpts]           = useState<{ id: string; name: string; unit: string; role_name: string }[]>([])
+  const [addingGuardrail, setAddingGuardrail] = useState(false)
+
   // Default cycleId once cycles are available (only when not already set)
   useEffect(() => {
     if (cycleId || isEdit) return
@@ -184,7 +193,16 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     supabase.from('units').select('id, name').order('name').then(({ data }) => {
       setUnits((data ?? []) as UnitOption[])
     })
-  }, [open, refresh])
+    if (isEdit && objective?.id) {
+      getGuardrailKpis(objective.id).then(setGuardrails).catch(() => {})
+    }
+  }, [open, refresh, isEdit, objective?.id])
+
+  // Load KPI options for guardrail picker when cycleId is set
+  useEffect(() => {
+    if (!isEdit || !cycleId) return
+    getKpisForGuardrailPicker(cycleId).then(setKpiOpts).catch(() => {})
+  }, [isEdit, cycleId])
 
   // Re-fetch parent objectives whenever the selected cycle changes
   useEffect(() => {
@@ -481,6 +499,74 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
               ))}
             </select>
           </label>
+        )}
+
+        {/* Guardrail KPIs (edit mode only — needs objective ID) */}
+        {isEdit && (
+          <div className="cd-field">
+            <span className="cd-field-lbl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Icon name="shield" size={13} />
+              Guardrail KPIs <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span>
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              {guardrails.map(g => (
+                <span key={g.id} className="cd-guardrail-tag">
+                  {g.name}
+                  <button
+                    type="button"
+                    className="cd-btn-icon"
+                    style={{ marginLeft: 2, fontSize: 11 }}
+                    onClick={async () => {
+                      await removeGuardrailKpi(g.id)
+                      setGuardrails(prev => prev.filter(x => x.id !== g.id))
+                    }}
+                    title="Remove guardrail"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {addingGuardrail ? (
+                <select
+                  className="cd-um-select"
+                  style={{ fontSize: 12 }}
+                  autoFocus
+                  defaultValue=""
+                  onChange={async e => {
+                    const kpiId = e.target.value
+                    if (!kpiId || !objective?.id || !user?.id) return
+                    setAddingGuardrail(false)
+                    await addGuardrailKpi(objective.id, kpiId, user.id)
+                    const updated = await getGuardrailKpis(objective.id)
+                    setGuardrails(updated)
+                  }}
+                  onBlur={() => setAddingGuardrail(false)}
+                >
+                  <option value="">Select a KPI…</option>
+                  {kpiOpts
+                    .filter(k => !guardrails.some(g => g.kpi_id === k.id))
+                    .map(k => (
+                      <option key={k.id} value={k.id}>
+                        {k.name}{k.role_name ? ` (${k.role_name})` : ''}
+                      </option>
+                    ))
+                  }
+                </select>
+              ) : (
+                <button
+                  type="button"
+                  className="cd-btn"
+                  style={{ fontSize: 12, padding: '2px 8px' }}
+                  onClick={() => setAddingGuardrail(true)}
+                >
+                  <Icon name="plus" size={11} /> Add guardrail
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '4px 0 0' }}>
+              KPIs whose deterioration will surface as a warning on this objective.
+            </p>
+          </div>
         )}
 
         {error && (

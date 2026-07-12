@@ -110,7 +110,20 @@ export interface KPI {
   unit_id?: string | null
   key_result_id?: string | null
   linked_kr_title?: string | null
+  linked_objective_id?: string | null
   trend: number[]     // last 13 kpi_snapshots values
+}
+
+export interface GuardrailKpi {
+  id: string          // objective_guardrail_kpis.id
+  kpi_id: string
+  name: string
+  actual: number
+  plan: number
+  unit: string
+  good: 'up' | 'down'
+  trend: number[]
+  deteriorating: boolean  // computed from trend + good direction
 }
 
 export interface KpiSnapshot {

@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
 import { useKrTasks } from '../hooks/useKrTasks'
 import { getKpisForKeyResult } from '../services/kpis.service'
+import { getGuardrailKpis } from '../services/guardrails.service'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -12,7 +14,64 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
 import { fmt, getQuarterWeeks, getCurrentWeekIdx } from '../lib/cadenceUtils'
-import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus } from '../types/cadence'
+import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, GuardrailKpi } from '../types/cadence'
+import type { LinkedKpiSummary } from '../services/kpis.service'
+
+// ── KPI status chip ───────────────────────────────────────────────────────
+
+function kpiStatusClass(actual: number, plan: number, good: 'up' | 'down'): string {
+  if (plan <= 0) return 'ok'
+  const ratio = actual / plan
+  if (good === 'up') {
+    if (ratio >= 0.95) return 'ok'
+    if (ratio >= 0.70) return 'warn'
+    return 'bad'
+  } else {
+    if (ratio <= 1.05) return 'ok'
+    if (ratio <= 1.30) return 'warn'
+    return 'bad'
+  }
+}
+
+function KpiLinkChip({ kpi }: { kpi: LinkedKpiSummary }) {
+  const navigate = useNavigate()
+  const status = kpiStatusClass(kpi.actual, kpi.plan, kpi.good)
+  return (
+    <button
+      type="button"
+      className={`cd-kpi-link-chip cd-kpi-link-chip--${status}`}
+      onClick={() => navigate(`/kpis?highlight=${kpi.id}`)}
+      title={`Navigate to KPI: ${kpi.name}`}
+    >
+      <Icon name="chartLine" size={11} />
+      <span className="cd-kpi-link-chip-name">{kpi.name}</span>
+      <span className="cd-kpi-link-chip-val">
+        {fmt(kpi.actual)}{kpi.unit} / {fmt(kpi.plan)}{kpi.unit}
+      </span>
+    </button>
+  )
+}
+
+// ── Guardrail KPI chip ────────────────────────────────────────────────────
+
+function GuardrailChip({ g }: { g: GuardrailKpi }) {
+  const navigate = useNavigate()
+  const status = kpiStatusClass(g.actual, g.plan, g.good)
+  return (
+    <button
+      type="button"
+      className={`cd-guardrail-chip cd-guardrail-chip--${status}`}
+      onClick={() => navigate(`/kpis?highlight=${g.kpi_id}`)}
+      title={`Guardrail KPI: ${g.name}`}
+    >
+      <span className="cd-guardrail-chip-name">{g.name}</span>
+      <span className="cd-guardrail-chip-val">
+        {fmt(g.actual)}{g.unit}
+      </span>
+      {g.deteriorating && <span className="cd-guardrail-chip-warn" title="Deteriorating">↘</span>}
+    </button>
+  )
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -49,7 +108,7 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
   const { tasks, addTask, editTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
   const [people, setPeople] = useState<SlimProfile[]>([])
-  const [linkedKpis, setLinkedKpis] = useState<{ id: string; name: string; actual: number; unit: string }[]>([])
+  const [linkedKpis, setLinkedKpis] = useState<LinkedKpiSummary[]>([])
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('')
@@ -112,11 +171,8 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
           <span className="cd-okr-kr-indent" />
           <span className="cd-okr-kr-title">{kr.title}</span>
           {linkedKpis.length > 0 && (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 8, fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
-              <Icon name="chartLine" size={11} />
-              {linkedKpis.length === 1
-                ? `${linkedKpis[0].name}: ${fmt(linkedKpis[0].actual)}${linkedKpis[0].unit}`
-                : `${linkedKpis.length} KPIs linked`}
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, marginLeft: 8 }}>
+              {linkedKpis.map(kpi => <KpiLinkChip key={kpi.id} kpi={kpi} />)}
             </span>
           )}
         </div>
@@ -263,9 +319,26 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
 
 function FocusObjBlock({ obj, userId }: { obj: CadenceObjective; userId: string }) {
   const [expanded, setExpanded] = useState(true)
+  const [guardrails, setGuardrails] = useState<GuardrailKpi[]>([])
+  const objRef = useRef<HTMLDivElement>(null)
+  const [searchParams] = useSearchParams()
+  const highlight = searchParams.get('highlight')
+
+  useEffect(() => {
+    getGuardrailKpis(obj.id).then(setGuardrails).catch(() => {})
+  }, [obj.id])
+
+  useEffect(() => {
+    if (highlight === obj.id && objRef.current) {
+      objRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      objRef.current.classList.add('cd-highlight-flash')
+      const t = setTimeout(() => objRef.current?.classList.remove('cd-highlight-flash'), 1500)
+      return () => clearTimeout(t)
+    }
+  }, [highlight, obj.id])
 
   return (
-    <div className="cd-okr-obj-block">
+    <div className="cd-okr-obj-block" ref={objRef}>
       {/* Objective row */}
       <div
         className="cd-okr-row cd-okr-row--obj"
@@ -299,6 +372,17 @@ function FocusObjBlock({ obj, userId }: { obj: CadenceObjective; userId: string 
         </div>
         <div className="cd-okr-conf-row" />
       </div>
+
+      {/* Guardrail KPIs */}
+      {guardrails.length > 0 && (
+        <div className="cd-guardrail-row">
+          <span style={{ color: 'var(--ink-faint)', flexShrink: 0, display: 'flex' }}><Icon name="shield" size={12} /></span>
+          <span className="cd-guardrail-label">Guardrails</span>
+          <div className="cd-guardrail-chips">
+            {guardrails.map(g => <GuardrailChip key={g.id} g={g} />)}
+          </div>
+        </div>
+      )}
 
       {/* KRs with tasks */}
       {expanded && obj.key_results.map(kr => (
