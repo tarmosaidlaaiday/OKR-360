@@ -15,6 +15,7 @@ import { Icon } from '../components/cadence/Icon'
 import { getISOWeek } from '../lib/cadenceUtils'
 import { EmptyState } from '../components/cadence/EmptyState'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { isOrgOrUnitAdmin } from '../services/permissions.service'
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -105,16 +106,10 @@ export function AnalyticsPage() {
 
   const currentWeek = getISOWeek(new Date())
 
-  // Check admin
+  // Check admin — uses shared helper so global admins are correctly included
   useEffect(() => {
     if (!user?.id) return
-    supabase
-      .from('people_units')
-      .select('id')
-      .eq('person_id', user.id)
-      .in('role', ['admin', 'lead'])
-      .limit(1)
-      .then(({ data: d }) => setIsAdmin((d ?? []).length > 0))
+    isOrgOrUnitAdmin(user.id).then(setIsAdmin)
   }, [user?.id])
 
   // Load analytics from RPC

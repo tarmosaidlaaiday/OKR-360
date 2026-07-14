@@ -18,7 +18,10 @@ function profileToPerson(p: any): Person {
 // ── Reports (people in my units where I'm admin/lead) ─────────────────────
 
 export async function getMyReports(userId: string): Promise<Person[]> {
-  // Get units where current user is admin/lead
+  // Intentionally unit-scoped: we want only people who actually report to this
+  // user in a specific unit, not everyone in the org. A global admin is not
+  // automatically a line-manager of every person — do NOT replace with
+  // isOrgOrUnitAdmin() here.
   const { data: myUnits } = await supabase
     .from('people_units')
     .select('unit_id')
@@ -58,6 +61,8 @@ export async function getMyManager(userId: string): Promise<Person | null> {
   if (!myUnits || myUnits.length === 0) return null
   const unitId = (myUnits[0] as any).unit_id
 
+  // Intentionally unit-scoped: we want the actual lead of this person's primary
+  // unit, not just any global admin. Do NOT replace with isOrgOrUnitAdmin().
   const { data: leads } = await supabase
     .from('people_units')
     .select('person:profiles!person_id(id, full_name, avatar_url, color, job_title)')

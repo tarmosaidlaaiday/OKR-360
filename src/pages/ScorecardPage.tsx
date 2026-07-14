@@ -232,6 +232,9 @@ export function ScorecardPage() {
       let managerName: string | null = null
       if (unitRes.data && unitRes.data.length > 0) {
         const unitId = (unitRes.data[0] as any).unit_id
+        // Intentionally unit-scoped: finding who actually leads this specific unit
+        // to display as the manager name on the scorecard. A global admin is not
+        // automatically this person's manager. Do NOT replace with isOrgOrUnitAdmin().
         const { data: leads } = await supabase
           .from('people_units')
           .select('person:profiles!person_id(full_name)')

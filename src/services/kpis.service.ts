@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { getISOWeek } from '../lib/cadenceUtils'
+import { isOrgOrUnitAdmin } from './permissions.service'
 import type { KPI, Person } from '../types/cadence'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -151,13 +152,7 @@ export async function upsertKpiSnapshot(
 // ── Admin check ────────────────────────────────────────────────────────────
 
 export async function canCreateKPI(userId: string): Promise<boolean> {
-  const { data } = await supabase
-    .from('people_units')
-    .select('id')
-    .eq('person_id', userId)
-    .in('role', ['admin', 'lead'])
-    .limit(1)
-  return (data ?? []).length > 0
+  return isOrgOrUnitAdmin(userId)
 }
 
 // ── Create KPI + target ────────────────────────────────────────────────────
