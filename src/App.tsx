@@ -12,7 +12,6 @@ import { LandingPage } from './pages/LandingPage'
 import { OnboardingWizard } from './pages/onboarding/OnboardingWizard'
 import { ProfileSetupPage } from './pages/onboarding/ProfileSetupPage'
 import { DashboardPage } from './pages/DashboardPage'
-import { OKRsPage } from './pages/OKRsPage'
 import { KPIsPage } from './pages/KPIsPage'
 import { ScorecardPage } from './pages/ScorecardPage'
 import { OneOnOnesPage } from './pages/OneOnOnesPage'
@@ -65,7 +64,6 @@ export default function App() {
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppShell />}>
                     <Route path="/dashboard"          element={<DashboardPage />} />
-                    <Route path="/okrs"               element={<OKRsPage />} />
                     <Route path="/kpis"               element={<KPIsPage />} />
                     <Route path="/scorecard"          element={<ScorecardPage />} />
                     <Route path="/1on1s"              element={<OneOnOnesPage />} />

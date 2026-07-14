@@ -22,7 +22,7 @@ const ORG_NAV = [
 
 // These paths make the parent nav item "active"
 const ACTIVE_PREFIXES: Record<string, string[]> = {
-  '/objectives': ['/objectives', '/okrs', '/my-focus', '/my-contribution', '/cascade'],
+  '/objectives': ['/objectives', '/my-focus', '/my-contribution', '/cascade'],
   '/people':     ['/people', '/1on1s', '/scorecard'],
   '/settings/structure': ['/settings/structure', '/cycles', '/settings/my-units'],
 }
