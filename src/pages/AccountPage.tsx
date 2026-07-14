@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getErrorMessage } from '../lib/errors'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { Icon } from '../components/cadence/Icon'
+import { Avatar } from '../components/cadence/Avatar'
+import { profileToPerson } from '../lib/cadenceUtils'
+import { profilesService } from '../services/profiles.service'
 import {
   getPreferences, upsertPreference,
   type NotificationPreference,
@@ -79,6 +82,89 @@ const NOTIF_TYPES: { type: AppNotification['type']; label: string; description: 
 
 export function AccountPage() {
   const { user, profile, refreshProfile } = useAuth()
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // ── Profile section ──
+  const [fullName, setFullName]       = useState(profile?.full_name ?? '')
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile?.avatar_url ?? null)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [uploading, setUploading]     = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [profileSaved, setProfileSaved] = useState(false)
+
+  // keep form in sync if profile loads after mount
+  useEffect(() => {
+    if (profile?.full_name) setFullName(profile.full_name)
+    if (profile?.avatar_url !== undefined) setAvatarPreview(profile.avatar_url ?? null)
+  }, [profile?.id])
+
+  function flashProfileSaved() {
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 2000)
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !profile?.id) return
+
+    // Optimistic preview
+    const reader = new FileReader()
+    reader.onload = ev => setAvatarPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+
+    setUploading(true)
+    setProfileError('')
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${profile.id}/avatar.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true })
+      if (upErr) throw new Error(upErr.message)
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      await profilesService.update(profile.id, { avatar_url: data.publicUrl })
+      await refreshProfile()
+      flashProfileSaved()
+    } catch (e) {
+      setProfileError(getErrorMessage(e))
+      setAvatarPreview(profile.avatar_url ?? null)
+    } finally {
+      setUploading(false)
+      // reset so the same file can be re-selected
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    if (!profile?.id) return
+    setAvatarPreview(null)
+    setProfileError('')
+    try {
+      await profilesService.update(profile.id, { avatar_url: null })
+      await refreshProfile()
+      flashProfileSaved()
+    } catch (e) {
+      setProfileError(getErrorMessage(e))
+      setAvatarPreview(profile.avatar_url ?? null)
+    }
+  }
+
+  async function handleSaveName(e: React.FormEvent) {
+    e.preventDefault()
+    if (!profile?.id || !fullName.trim()) return
+    setProfileSaving(true)
+    setProfileError('')
+    try {
+      await profilesService.update(profile.id, { full_name: fullName.trim() })
+      await refreshProfile()
+      flashProfileSaved()
+    } catch (e) {
+      setProfileError(getErrorMessage(e))
+    } finally {
+      setProfileSaving(false)
+    }
+  }
 
   // ── Password section ──
   const [currentPw, setCurrentPw] = useState('')
@@ -145,11 +231,78 @@ export function AccountPage() {
     }
   }
 
+  const me = profile ? profileToPerson(profile) : null
+
   return (
     <div className="cd-page">
       <PageHeader title="Account settings" />
 
       <div style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* Profile section */}
+        <div className="cd-card" style={{ padding: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 20px' }}>Profile</h2>
+
+          {/* Avatar row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid var(--line)' }}>
+            {avatarPreview
+              ? <img src={avatarPreview} alt={profile?.full_name ?? 'You'} style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              : <Avatar person={me} size={56} />
+            }
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn--ghost cd-btn--sm"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? 'Uploading…' : 'Upload photo'}
+                </button>
+                {avatarPreview && (
+                  <button type="button" className="cd-btn cd-btn--ghost cd-btn--sm" onClick={handleRemoveAvatar}>
+                    Remove photo
+                  </button>
+                )}
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--ink-soft)', margin: 0 }}>
+                {avatarPreview ? 'JPG, PNG or GIF, max 5 MB' : 'No photo — showing initials'}
+              </p>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />
+          </div>
+
+          {/* Full name */}
+          <form onSubmit={handleSaveName} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="cd-field">
+              <label className="cd-label" htmlFor="acc-full-name">Full name</label>
+              <input
+                id="acc-full-name"
+                className="cd-input"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Your full name"
+                required
+              />
+            </div>
+            <div className="cd-field">
+              <label className="cd-label">Email</label>
+              <input className="cd-input" value={user?.email ?? ''} disabled style={{ opacity: 0.6 }} />
+            </div>
+            {profileError && <p style={{ fontSize: 13, color: 'var(--bad)', margin: 0 }}>{profileError}</p>}
+            {profileSaved && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--ok)' }}>
+                <Icon name="checkCircle" size={14} />
+                Saved
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="cd-btn cd-btn--primary" disabled={profileSaving || !fullName.trim()}>
+                {profileSaving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </form>
+        </div>
 
         {/* Password section */}
         <div className="cd-card" style={{ padding: 24 }}>

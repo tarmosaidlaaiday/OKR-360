@@ -13,7 +13,7 @@ export const profilesService = {
     return data
   },
 
-  async update(id: string, input: { full_name?: string; team_id?: string | null }): Promise<Profile> {
+  async update(id: string, input: { full_name?: string; team_id?: string | null; avatar_url?: string | null }): Promise<Profile> {
     const { data, error } = await supabase
       .from('profiles')
       .update(input)
