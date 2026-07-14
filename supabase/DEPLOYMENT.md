@@ -21,18 +21,19 @@ Missing a surface is the single most common source of production drift.
 
 ## Surface 2 — Database migrations (Supabase)
 
-**Does NOT auto-deploy.** Migrations in `supabase/migrations/` must be pushed manually.
-
-**To apply pending migrations:**
-```bash
-SUPABASE_ACCESS_TOKEN=<token> npx supabase db push --linked
-```
+**Auto-deploys via GitHub Actions** when `supabase/migrations/**` or `supabase/functions/**`
+files change on `main`. The workflow is `.github/workflows/supabase-deploy.yml`.
 
 **To check which migrations are unapplied:**
 ```bash
 SUPABASE_ACCESS_TOKEN=<token> npx supabase migration list --linked
 ```
 Rows where `remote` is blank have not been applied to production.
+
+**To apply pending migrations manually (if CI failed):**
+```bash
+SUPABASE_ACCESS_TOKEN=<token> npx supabase db push --linked
+```
 
 **Critical rules:**
 - Never modify a migration file after it has been applied to production.
@@ -52,17 +53,12 @@ or as `SUPABASE_ACCESS_TOKEN` in your shell profile for convenience.
 
 ## Surface 3 — Edge functions (Supabase)
 
-**Does NOT auto-deploy.** Each function under `supabase/functions/` must be
-deployed separately with the CLI.
+**Auto-deploys via GitHub Actions** alongside migrations (same workflow).
 
-**To deploy a single function:**
+**To deploy manually (if CI failed):**
 ```bash
-SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy <function-name> --project-ref githzeldiwxkmruhaver
-```
-
-**To deploy all functions at once:**
-```bash
-SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy --project-ref githzeldiwxkmruhaver
+SUPABASE_ACCESS_TOKEN=<token> npx supabase functions deploy \
+  --project-ref githzeldiwxkmruhaver
 ```
 
 **To check what's deployed:**
@@ -78,36 +74,47 @@ Cross-reference with `git log --oneline -- supabase/functions/<name>/index.ts`.
 ## Schema drift audit query
 
 Run this in the Supabase SQL Editor to check that every table and column
-referenced by the frontend exists in the live database:
+referenced by the frontend exists in the live database.
+**Both queries must return zero rows on a healthy database.**
 
 ```sql
--- Missing tables
+-- ── Missing tables ──────────────────────────────────────────────────────────
 SELECT tablename AS missing_table
 FROM (VALUES
   ('checkin_streaks'),('checkins'),('comments'),('confidence_logs'),
   ('cycles'),('initiatives'),('key_result_scores'),('key_results'),
   ('kpi_snapshots'),('kpi_targets'),('kpis'),('kr_tasks'),('levels'),
-  ('notification_preferences'),('notifications'),('objective_reviews'),
-  ('objectives'),('one_on_one_entries'),('one_on_ones'),('org_settings'),
-  ('organisations'),('pending_approvals'),('people_units'),('profiles'),
-  ('retros'),('tasks'),('teams'),('units')
+  ('notification_preferences'),('notifications'),('objective_guardrail_kpis'),
+  ('objective_reviews'),('objectives'),('one_on_one_entries'),('one_on_ones'),
+  ('org_settings'),('organisations'),('pending_approvals'),('people_units'),
+  ('profiles'),('retros'),('tasks'),('teams'),('units')
 ) AS t(tablename)
 WHERE tablename NOT IN (
   SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'
 );
 
--- Missing columns (embedded PostgREST selects)
+-- ── Missing columns ─────────────────────────────────────────────────────────
 SELECT col.table_name, col.column_name AS missing_column
 FROM (VALUES
+  -- checkins (v2 columns)
   ('checkins','blocker_text'),('checkins','confidence'),('checkins','has_blocker'),
   ('checkins','new_value'),('checkins','note'),('checkins','person_id'),
   ('checkins','week_number'),('checkins','year'),
+  -- key_results
   ('key_results','confidence'),('key_results','direction'),('key_results','final_score'),
   ('key_results','owner_id'),('key_results','start_value'),('key_results','target_type'),
   ('key_results','unit'),
+  -- levels
   ('levels','color'),('levels','depth'),('levels','enabled'),
+  -- notifications (v2 columns)
+  ('notifications','action_url'),('notifications','read_at'),
+  -- objective_guardrail_kpis (added 2026-07-12)
+  ('objective_guardrail_kpis','objective_id'),('objective_guardrail_kpis','kpi_id'),
+  ('objective_guardrail_kpis','created_by'),
+  -- objective_reviews
   ('objective_reviews','carry_forward'),('objective_reviews','overall_note'),
   ('objective_reviews','reflection_improve'),('objective_reviews','reflection_what_drove'),
+  -- one_on_one_entries
   ('one_on_one_entries','feedback_for_report'),('one_on_one_entries','feedback_from_report'),
   ('one_on_one_entries','happiness'),('one_on_one_entries','happiness_followup'),
   ('one_on_one_entries','last_saved_at'),('one_on_one_entries','personal_highlight'),
@@ -115,8 +122,11 @@ FROM (VALUES
   ('one_on_one_entries','professional_low'),('one_on_one_entries','work_blockers'),
   ('one_on_one_entries','work_needs_manager'),('one_on_one_entries','work_topics'),
   ('one_on_one_entries','work_wins'),
+  -- profiles
   ('profiles','avatar_url'),('profiles','color'),('profiles','job_title'),('profiles','role'),
+  -- teams
   ('teams','color'),
+  -- units
   ('units','level_id'),('units','parent_id'),('units','position')
 ) AS col(table_name, column_name)
 WHERE (col.table_name, col.column_name) NOT IN (
@@ -124,15 +134,73 @@ WHERE (col.table_name, col.column_name) NOT IN (
 );
 ```
 
-Both queries should return zero rows on a healthy database.
+---
+
+## SECURITY DEFINER function inventory
+
+Every time a SECURITY DEFINER function or storage RLS policy is added or modified,
+run this query in the SQL Editor and compare against the checklist below:
+
+```sql
+SELECT n.nspname AS schema, p.proname AS function_name,
+       pg_get_function_identity_arguments(p.oid) AS arguments,
+       p.prosecdef AS is_security_definer
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.prosecdef = true
+ORDER BY p.proname;
+```
+
+**Tenant-scoping checklist — apply to every SECURITY DEFINER function and every new RLS policy BEFORE merging:**
+
+- [ ] **No org-widening fallback**: no `OR org_id IS NULL` or `OR tenant_id IS NULL` branches that silently widen scope to cross-tenant rows
+- [ ] **Parameters validated against caller's org**: any `p_person_id`, `p_org_id`, `p_unit_id`, etc. accepted as input must be confirmed to belong to the same org as `auth.uid()` before acting on them — the function must not trust caller-supplied IDs blindly
+- [ ] **No `WITH CHECK (true)`**: insert/update RLS policies must scope by org membership, not allow unrestricted writes (see the guardrail_insert policy for the correct pattern)
+- [ ] **RLS still applies for plain reads within the function**: SECURITY DEFINER bypasses RLS by default — if the function SELECTs from tenant-scoped tables, include explicit `WHERE org_id = (SELECT org_id FROM profiles WHERE id = auth.uid())` filters rather than relying on RLS to enforce them
+- [ ] **Storage policies path-scoped**: storage INSERT/UPDATE/DELETE policies must check `(storage.foldername(name))[1]` matches the caller's own ID or org ID — not just `bucket_id`
+- [ ] **No privilege escalation via EXECUTE**: every new function granted `EXECUTE TO authenticated` should be reviewed to confirm an authenticated user cannot use it to act on another org's data
+
+**Known-clean functions (as of 2026-07-14, post full security sweep):**
+The baseline function list was audited on 2026-07-12 (migration `20260712000001_fix_security_definer_tenant_scoping.sql`).
+Functions added or modified after that date that have been re-checked:
+- `sync_kr_on_checkin` — trigger, no caller-supplied parameters, operates on `NEW` row only ✓
+- `send_notification` — accepts `p_person_id` without org validation (intentional: cross-user notifications like blocker alerts require inserting for another person); mitigated by the fact only authenticated users can call it and `notif_insert_auth` policy allows it ✓
+- `update_checkin_streak` — accepts `p_person_id`; called client-side only for `auth.uid()` in `weeklyCheckins.service.ts` ✓
+- `handle_user_activation` — trigger on `auth.users`, no caller parameters ✓
+
+**RLS policies added after the 2026-07-12 audit:**
+- `objective_guardrail_kpis`: read uses org-join (✓), insert validates both objective and kpi org membership (✓), delete uses org-join (✓) — no `WITH CHECK (true)` anywhere
+- `avatars` storage bucket: public read (✓ intentional, same as org-logos), write/update/delete gated on `(storage.foldername(name))[1] = auth.uid()::text` — users can only touch their own `{person_id}/` folder (✓)
+
+---
+
+## CI: GitHub Actions
+
+The workflow `.github/workflows/supabase-deploy.yml` runs automatically on every push
+to `main` that touches `supabase/migrations/**` or `supabase/functions/**`.
+
+**To verify the last run succeeded:**
+- GitHub → Actions → "Deploy Supabase (migrations + edge functions)"
+- Every merge that added migration files should have a green run.
+- A yellow/orange run that was only manually triggered (not auto-triggered by a push)
+  means the automatic path hasn't been exercised — re-check the workflow trigger paths.
+
+**Required GitHub secrets** (Settings → Secrets and variables → Actions):
+- `SUPABASE_ACCESS_TOKEN` — personal token from supabase.com/dashboard/account/tokens
+- `SUPABASE_PROJECT_REF` — `githzeldiwxkmruhaver`
+
+If a run fails, the error will be in the "Push pending migrations" step.
+The most common cause is an expired access token — regenerate and update the secret.
 
 ---
 
 ## Checklist before releasing a feature that touches the DB
 
-- [ ] Migration file created in `supabase/migrations/` with timestamp prefix
-- [ ] Migration uses `IF NOT EXISTS` / `OR REPLACE` throughout
-- [ ] `supabase db push --linked` run and output confirms 0 errors
+- [ ] Migration file created in `supabase/migrations/` with timestamp prefix `YYYYMMDD_NNN_name.sql`
+- [ ] Migration uses `IF NOT EXISTS` / `OR REPLACE` throughout (idempotent)
+- [ ] If adding a SECURITY DEFINER function or RLS policy: full tenant-scoping checklist above completed
+- [ ] `supabase db push --linked` run locally and output confirms 0 errors (or CI ran green)
 - [ ] `supabase migration list --linked` shows no blank `remote` entries
-- [ ] If edge functions changed: `supabase functions deploy <name>` run
+- [ ] Schema drift audit query above updated to include any new tables/columns
+- [ ] If edge functions changed: `supabase functions deploy <name>` run (or CI ran green)
 - [ ] `npm run build` is clean
