@@ -4757,3 +4757,70 @@ kbd.cd-kbd {
   animation: cd-highlight-flash 1.5s ease-out forwards;
   border-radius: 4px;
 }
+
+/* ── Row delete button (hover-reveal trash) ──────────────────────────────── */
+
+.cd-row-deletable { position: relative; }
+
+.cd-row-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  margin-left: 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms, color 120ms, background 120ms;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.cd-row-deletable:hover .cd-row-delete-btn,
+.cd-row-delete-btn--vis {
+  opacity: 1;
+}
+.cd-row-delete-btn:hover {
+  color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 10%, transparent);
+}
+
+/* ── Inline delete confirm ───────────────────────────────────────────────── */
+
+.cd-delete-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--bad);
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.cd-delete-confirm-yes,
+.cd-delete-confirm-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+.cd-delete-confirm-yes {
+  background: var(--bad);
+  color: #fff;
+}
+.cd-delete-confirm-yes:hover { filter: brightness(1.1); }
+.cd-delete-confirm-no {
+  background: var(--bg-sub);
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+}
+.cd-delete-confirm-no:hover { background: var(--line); }

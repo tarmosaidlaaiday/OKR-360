@@ -266,6 +266,13 @@ export async function getKpisForKeyResult(keyResultId: string): Promise<LinkedKp
   }))
 }
 
+// ── Delete KPI ────────────────────────────────────────────────────────────
+
+export async function deleteKPI(id: string): Promise<void> {
+  const { error } = await supabase.from('kpis').delete().eq('id', id)
+  if (error) throw error
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 function currentWeekYear() {

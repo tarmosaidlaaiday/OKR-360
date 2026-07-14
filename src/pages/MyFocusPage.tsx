@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { objectivesService } from '../services/objectives.service'
+import { keyResultsService } from '../services/keyResults.service'
 import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
@@ -73,6 +75,18 @@ function GuardrailChip({ g }: { g: GuardrailKpi }) {
   )
 }
 
+// ── Inline delete confirm (shared pattern) ────────────────────────────────
+
+function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <span className="cd-delete-confirm" onClick={e => e.stopPropagation()}>
+      Delete?
+      <button type="button" className="cd-delete-confirm-yes" onClick={onConfirm} title="Confirm delete">✓</button>
+      <button type="button" className="cd-delete-confirm-no"  onClick={onCancel}  title="Cancel">✕</button>
+    </span>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 type SlimProfile = { id: string; full_name: string; avatar_url: string | null; color: string }
@@ -105,10 +119,11 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 
 // ── KR row with inline task list ─────────────────────────────────────────
 
-function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
+function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: string; onDelete?: (id: string) => void }) {
   const { tasks, addTask, editTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
   const [people, setPeople] = useState<SlimProfile[]>([])
   const [linkedKpis, setLinkedKpis] = useState<LinkedKpiSummary[]>([])
+  const [confirmDeleteKr, setConfirmDeleteKr] = useState(false)
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('')
@@ -170,6 +185,14 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
         <div className="cd-okr-col-title">
           <span className="cd-okr-kr-indent" />
           <span className="cd-okr-kr-title">{kr.title}</span>
+          {onDelete && (
+            confirmDeleteKr
+              ? <DeleteConfirm onConfirm={() => onDelete(kr.id)} onCancel={() => setConfirmDeleteKr(false)} />
+              : <button type="button" className="cd-row-delete-btn" title="Delete key result"
+                  onClick={e => { e.stopPropagation(); setConfirmDeleteKr(true) }}>
+                  <Icon name="trash" size={12} />
+                </button>
+          )}
           {linkedKpis.length > 0 && (
             <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, marginLeft: 8 }}>
               {linkedKpis.map(kpi => <KpiLinkChip key={kpi.id} kpi={kpi} />)}
@@ -317,9 +340,15 @@ function KrWithTasks({ kr, userId }: { kr: CadenceKeyResult; userId: string }) {
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId }: { obj: CadenceObjective; userId: string }) {
+function FocusObjBlock({ obj, userId, onDeleteObj, onDeleteKr }: {
+  obj: CadenceObjective
+  userId: string
+  onDeleteObj?: (id: string) => void
+  onDeleteKr?: (objId: string, krId: string) => void
+}) {
   const [expanded, setExpanded] = useState(true)
   const [guardrails, setGuardrails] = useState<GuardrailKpi[]>([])
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const objRef = useRef<HTMLDivElement>(null)
   const [searchParams] = useSearchParams()
   const highlight = searchParams.get('highlight')
@@ -358,6 +387,14 @@ function FocusObjBlock({ obj, userId }: { obj: CadenceObjective; userId: string 
             <Icon name={expanded ? 'chevron' : 'chevronR'} size={13} />
           </button>
           <span className="cd-okr-obj-title">{obj.title}</span>
+          {onDeleteObj && (
+            confirmDelete
+              ? <DeleteConfirm onConfirm={() => onDeleteObj(obj.id)} onCancel={() => setConfirmDelete(false)} />
+              : <button type="button" className="cd-row-delete-btn" title="Delete objective"
+                  onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}>
+                  <Icon name="trash" size={13} />
+                </button>
+          )}
         </div>
         <div className="cd-okr-col-supports" />
         <div className="cd-okr-col-owner">
@@ -386,7 +423,12 @@ function FocusObjBlock({ obj, userId }: { obj: CadenceObjective; userId: string 
 
       {/* KRs with tasks */}
       {expanded && obj.key_results.map(kr => (
-        <KrWithTasks key={kr.id} kr={kr} userId={userId} />
+        <KrWithTasks
+          key={kr.id}
+          kr={kr}
+          userId={userId}
+          onDelete={onDeleteKr ? (krId) => onDeleteKr(obj.id, krId) : undefined}
+        />
       ))}
     </div>
   )
@@ -402,7 +444,19 @@ export function MyFocusPage() {
   const year = activeCycle?.year ?? new Date().getFullYear()
 
   const userId = profile?.id ?? null
-  const { objectives, loading, error } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
+  const { objectives, loading, error, setObjectives } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
+
+  async function handleDeleteObj(id: string) {
+    await objectivesService.delete(id)
+    setObjectives(prev => prev.filter(o => o.id !== id))
+  }
+
+  async function handleDeleteKr(objId: string, krId: string) {
+    await keyResultsService.delete(krId)
+    setObjectives(prev => prev.map(o =>
+      o.id === objId ? { ...o, key_results: o.key_results.filter(k => k.id !== krId) } : o
+    ))
+  }
 
   const weeks = getQuarterWeeks(quarter)
   const currentWeekIdx = getCurrentWeekIdx(quarter)
@@ -439,7 +493,13 @@ export function MyFocusPage() {
           </p>
         ) : (
           objectives.map(obj => (
-            <FocusObjBlock key={obj.id} obj={obj} userId={profile!.id} />
+            <FocusObjBlock
+              key={obj.id}
+              obj={obj}
+              userId={profile!.id}
+              onDeleteObj={handleDeleteObj}
+              onDeleteKr={handleDeleteKr}
+            />
           ))
         )}
       </div>

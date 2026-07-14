@@ -14,7 +14,21 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Segmented } from '../components/cadence/Segmented'
 import { Icon } from '../components/cadence/Icon'
 import { getQuarterWeeks, getCurrentWeekIdx, fmt } from '../lib/cadenceUtils'
+import { objectivesService } from '../services/objectives.service'
+import { keyResultsService } from '../services/keyResults.service'
 import type { CadenceObjective } from '../types/cadence'
+
+// ── Inline delete confirm ─────────────────────────────────────────────────
+
+function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <span className="cd-delete-confirm" onClick={e => e.stopPropagation()}>
+      Delete?
+      <button type="button" className="cd-delete-confirm-yes" onClick={onConfirm} title="Confirm delete">✓</button>
+      <button type="button" className="cd-delete-confirm-no"  onClick={onCancel}  title="Cancel">✕</button>
+    </span>
+  )
+}
 
 type ViewMode = 'list' | 'cascade'
 
@@ -77,10 +91,12 @@ interface ObjRowProps {
   onToggle: () => void
   isTopLevel: boolean // for "Supports" warning
   indentDepth?: number  // cascade mode indent
+  onDelete?: (id: string) => void
 }
 
-function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0 }: ObjRowProps) {
+function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0, onDelete }: ObjRowProps) {
   const indent = indentDepth * 20
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   function scrollToObj(id: string) {
     document.getElementById(`obj-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -89,7 +105,7 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
   return (
     <div
       id={`obj-${obj.id}`}
-      className="cd-okr-row cd-okr-row--obj"
+      className="cd-okr-row cd-okr-row--obj cd-row-deletable"
       onClick={onToggle}
       style={{ '--row-indent': `${indent}px` } as React.CSSProperties}
     >
@@ -104,6 +120,14 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
           <Icon name={expanded ? 'chevron' : 'chevronR'} size={13} />
         </button>
         <span className="cd-okr-obj-title">{obj.title}</span>
+        {onDelete && (
+          confirmDelete
+            ? <DeleteConfirm onConfirm={() => onDelete(obj.id)} onCancel={() => setConfirmDelete(false)} />
+            : <button type="button" className="cd-row-delete-btn" title="Delete objective"
+                onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}>
+                <Icon name="trash" size={13} />
+              </button>
+        )}
       </div>
 
       {/* Supports */}
@@ -144,42 +168,73 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
   )
 }
 
-function KrRows({ obj, weeks, currentWeekIdx }: { obj: CadenceObjective; weeks: number[]; currentWeekIdx: number }) {
+function KrRow({ kr, weeks, currentWeekIdx, onDelete }: {
+  kr: CadenceObjective['key_results'][0]
+  weeks: number[]
+  currentWeekIdx: number
+  onDelete?: (id: string) => void
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  return (
+    <div className="cd-okr-row cd-okr-row--kr cd-row-deletable">
+      <div className="cd-okr-col-level" />
+      <div className="cd-okr-col-title">
+        <span className="cd-okr-kr-indent" />
+        <span className="cd-okr-kr-title">{kr.title}</span>
+        {onDelete && (
+          confirmDelete
+            ? <DeleteConfirm onConfirm={() => onDelete(kr.id)} onCancel={() => setConfirmDelete(false)} />
+            : <button type="button" className="cd-row-delete-btn" title="Delete key result"
+                onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}>
+                <Icon name="trash" size={12} />
+              </button>
+        )}
+      </div>
+      <div className="cd-okr-col-supports" />
+      <div className="cd-okr-col-owner">
+        <Avatar person={kr.owner ?? null} size={18} />
+      </div>
+      <div className="cd-okr-col-status" />
+      <div className="cd-okr-col-progress">
+        {kr.target_type !== 'boolean' ? (
+          <>
+            <ProgressBar value={Math.min(1, kr.current_value / (kr.target_value || 1))} height={4} />
+            <span className="cd-okr-pct">
+              {fmt(kr.current_value)}{kr.unit ?? ''} / {fmt(kr.target_value)}{kr.unit ?? ''}
+            </span>
+          </>
+        ) : (
+          <span className="cd-okr-pct">{kr.current_value ? 'Done' : 'Not done'}</span>
+        )}
+      </div>
+      <div className="cd-okr-conf-row">
+        <ConfidenceTrend
+          values={kr.confidence}
+          currentIdx={currentWeekIdx}
+          weeks={weeks}
+          size={18}
+        />
+      </div>
+    </div>
+  )
+}
+
+function KrRows({ obj, weeks, currentWeekIdx, onDeleteKr }: {
+  obj: CadenceObjective
+  weeks: number[]
+  currentWeekIdx: number
+  onDeleteKr?: (objId: string, krId: string) => void
+}) {
   return (
     <>
       {obj.key_results.map(kr => (
-        <div key={kr.id} className="cd-okr-row cd-okr-row--kr">
-          <div className="cd-okr-col-level" />
-          <div className="cd-okr-col-title">
-            <span className="cd-okr-kr-indent" />
-            <span className="cd-okr-kr-title">{kr.title}</span>
-          </div>
-          <div className="cd-okr-col-supports" />
-          <div className="cd-okr-col-owner">
-            <Avatar person={kr.owner ?? null} size={18} />
-          </div>
-          <div className="cd-okr-col-status" />
-          <div className="cd-okr-col-progress">
-            {kr.target_type !== 'boolean' ? (
-              <>
-                <ProgressBar value={Math.min(1, kr.current_value / (kr.target_value || 1))} height={4} />
-                <span className="cd-okr-pct">
-                  {fmt(kr.current_value)}{kr.unit ?? ''} / {fmt(kr.target_value)}{kr.unit ?? ''}
-                </span>
-              </>
-            ) : (
-              <span className="cd-okr-pct">{kr.current_value ? 'Done' : 'Not done'}</span>
-            )}
-          </div>
-          <div className="cd-okr-conf-row">
-            <ConfidenceTrend
-              values={kr.confidence}
-              currentIdx={currentWeekIdx}
-              weeks={weeks}
-              size={18}
-            />
-          </div>
-        </div>
+        <KrRow
+          key={kr.id}
+          kr={kr}
+          weeks={weeks}
+          currentWeekIdx={currentWeekIdx}
+          onDelete={onDeleteKr ? (krId) => onDeleteKr(obj.id, krId) : undefined}
+        />
       ))}
     </>
   )
@@ -226,13 +281,25 @@ export function OKRsPage() {
   const quarter = activeCycle?.quarter ?? 1
   const year = activeCycle?.year ?? new Date().getFullYear()
 
-  const { objectives, loading, error } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
+  const { objectives, loading, error, setObjectives } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
   const { levels } = useOrg()
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
   const { setObjectivesModalOpen } = usePageActionStore()
+
+  async function handleDeleteObj(id: string) {
+    await objectivesService.delete(id)
+    setObjectives(prev => prev.filter(o => o.id !== id))
+  }
+
+  async function handleDeleteKr(objId: string, krId: string) {
+    await keyResultsService.delete(krId)
+    setObjectives(prev => prev.map(o =>
+      o.id === objId ? { ...o, key_results: o.key_results.filter(k => k.id !== krId) } : o
+    ))
+  }
 
   const weeks = getQuarterWeeks(quarter)
 
@@ -355,9 +422,10 @@ export function OKRsPage() {
                 onToggle={() => toggleExpand(obj.id)}
                 isTopLevel={isTopLevel}
                 indentDepth={viewMode === 'cascade' ? depth : 0}
+                onDelete={handleDeleteObj}
               />
               {isExpanded && obj.key_results.length > 0 && (
-                <KrRows obj={obj} weeks={weeks} currentWeekIdx={currentWeekIdx} />
+                <KrRows obj={obj} weeks={weeks} currentWeekIdx={currentWeekIdx} onDeleteKr={handleDeleteKr} />
               )}
             </div>
           )

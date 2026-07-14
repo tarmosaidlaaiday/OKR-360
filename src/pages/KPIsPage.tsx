@@ -10,7 +10,7 @@ import { Segmented } from '../components/cadence/Segmented'
 import { CdModal } from '../components/cadence/CdModal'
 import { Icon } from '../components/cadence/Icon'
 import { fmt, isOnTrack, makeTrend } from '../lib/cadenceUtils'
-import { createKPI, getAdminUnits, getUnitMembers } from '../services/kpis.service'
+import { createKPI, deleteKPI, getAdminUnits, getUnitMembers } from '../services/kpis.service'
 import { getErrorMessage } from '../lib/errors'
 import { commentsService } from '../services/comments.service'
 import { CommentThread } from '../components/comments/CommentThread'
@@ -100,12 +100,23 @@ function ActualCell({ kpi, onSave }: { kpi: KPI; onSave: (v: number) => Promise<
 
 // ── KPI row ───────────────────────────────────────────────────────────────
 
-function KPIRow({ kpi, onSave, highlighted }: { kpi: KPI; onSave: (v: number) => Promise<void>; highlighted?: boolean }) {
+function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <span className="cd-delete-confirm" onClick={e => e.stopPropagation()}>
+      Delete?
+      <button type="button" className="cd-delete-confirm-yes" onClick={onConfirm} title="Confirm delete">✓</button>
+      <button type="button" className="cd-delete-confirm-no"  onClick={onCancel}  title="Cancel">✕</button>
+    </span>
+  )
+}
+
+function KPIRow({ kpi, onSave, onDelete, highlighted }: { kpi: KPI; onSave: (v: number) => Promise<void>; onDelete?: (id: string) => void; highlighted?: boolean }) {
   const navigate = useNavigate()
   const ok = isOnTrack(kpi)
   const trend = kpi.trend.length >= 3 ? kpi.trend : makeTrend(kpi)
   const [commentCount, setCommentCount] = useState<number | null>(null)
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const rowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -184,6 +195,14 @@ function KPIRow({ kpi, onSave, highlighted }: { kpi: KPI; onSave: (v: number) =>
               <span style={{ fontSize: 10, marginLeft: 2 }}>{commentCount}</span>
             )}
           </button>
+          {onDelete && (
+            confirmDelete
+              ? <DeleteConfirm onConfirm={() => onDelete(kpi.id)} onCancel={() => setConfirmDelete(false)} />
+              : <button type="button" className="cd-row-delete-btn cd-row-delete-btn--vis" title="Delete KPI"
+                  onClick={() => setConfirmDelete(true)}>
+                  <Icon name="trash" size={13} />
+                </button>
+          )}
         </span>
       </div>
       {commentsOpen && (
@@ -387,7 +406,12 @@ type GroupBy = 'role' | 'owner' | 'all'
 export function KPIsPage() {
   usePageTitle('KPIs')
   const { activeCycle } = useCycle()
-  const { kpis, loading, isAdmin, updateActual, reload } = useKPIs(activeCycle?.id ?? null)
+  const { kpis, loading, isAdmin, updateActual, reload, setKpis } = useKPIs(activeCycle?.id ?? null)
+
+  async function handleDeleteKpi(id: string) {
+    await deleteKPI(id)
+    setKpis(prev => prev.filter(k => k.id !== id))
+  }
   const [groupBy, setGroupBy] = useState<GroupBy>('role')
   const [addOpen, setAddOpen] = useState(false)
   const { kpiModalOpen, setKpiModalOpen } = usePageActionStore()
@@ -512,6 +536,7 @@ export function KPIsPage() {
                   key={k.id}
                   kpi={k}
                   onSave={v => updateActual(k.id, v)}
+                  onDelete={isAdmin ? handleDeleteKpi : undefined}
                   highlighted={highlight === k.id}
                 />
               ))}

@@ -70,5 +70,5 @@ export function useMyFocusObjectives(cycleId: string | null, userId: string | nu
     load()
   }, [cycleId, userId, quarter, year])
 
-  return { objectives, loading, error }
+  return { objectives, loading, error, setObjectives }
 }

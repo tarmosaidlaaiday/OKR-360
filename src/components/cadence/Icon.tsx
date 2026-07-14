@@ -5,7 +5,7 @@ type IconName =
   | 'flag' | 'sparkle' | 'calendar' | 'settings' | 'grid'
   | 'link' | 'x' | 'star' | 'users' | 'bell' | 'alertTriangle'
   | 'mail' | 'shield' | 'slash' | 'eye' | 'eyeOff' | 'checkCircle' | 'chartLine' | 'sitemap'
-  | 'history' | 'zap' | 'hourglass' | 'thumbsUp' | 'moreVertical' | 'pencil'
+  | 'history' | 'zap' | 'hourglass' | 'thumbsUp' | 'moreVertical' | 'pencil' | 'trash'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard:  <><rect x="3" y="3"  width="7" height="9"  rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/></>,
@@ -50,6 +50,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   thumbsUp:      <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></>,
   moreVertical:  <><circle cx="12" cy="5"  r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/></>,
   pencil:        <><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>,
+  trash:         <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></>,
 }
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
