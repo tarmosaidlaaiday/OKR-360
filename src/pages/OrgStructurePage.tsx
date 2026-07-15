@@ -7,7 +7,6 @@ import { saveOrgSettings } from '../services/orgSettings.service'
 import { LevelsEditor } from '../components/settings/LevelsEditor'
 import { UnitsTree } from '../components/settings/UnitsTree'
 import { CascadeSettings } from '../components/settings/CascadeSettings'
-import { SidebarPreview } from '../components/settings/SidebarPreview'
 import type { Level, Unit, OrgSettings } from '../types/cadence'
 
 export function OrgStructurePage() {
@@ -118,14 +117,8 @@ export function OrgStructurePage() {
           />
         </div>
 
-        {/* Right column: Live preview + Cascade toggles */}
+        {/* Right column: Cascade toggles */}
         <div className="cd-org-right">
-          <div className="cd-set-section">
-            <h3 className="cd-set-section-title">Sidebar preview</h3>
-            <p className="cd-set-section-sub">Updates live as you make changes.</p>
-            <SidebarPreview levels={draftLevels} units={draftUnits} />
-          </div>
-
           <CascadeSettings
             settings={draftSettings}
             onChange={setDraftSettings}
