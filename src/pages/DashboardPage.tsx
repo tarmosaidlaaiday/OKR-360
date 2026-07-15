@@ -19,6 +19,7 @@ import { useCascadeChain } from '../hooks/useCascadeChain'
 import type { Task, OneOnOne, Person } from '../types/cadence'
 import type { CadenceObjective } from '../types/cadence'
 import { usePageTitle } from '../hooks/usePageTitle'
+import { useMyOrgPosition } from '../hooks/useMyOrgPosition'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -222,6 +223,7 @@ interface Retro {
 
 export function DashboardPage() {
   usePageTitle('Dashboard')
+  const orgPosition    = useMyOrgPosition()
   const navigate       = useNavigate()
   const { user, profile } = useAuth()
   const { activeCycle }   = useCycle()
@@ -241,8 +243,7 @@ export function DashboardPage() {
   const [primaryUnit, setPrimaryUnit]   = useState<{ id: string; name: string } | null>(null)
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [orgAvg, setOrgAvg]             = useState<string>('—')
-  const [addingTask, setAddingTask]     = useState(false)
-  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
   const addInputRef = useRef<HTMLInputElement>(null)
 
   const { objectives } = useCadenceObjectives(activeCycle?.id ?? null, quarter, cycleYear)
@@ -376,19 +377,21 @@ export function DashboardPage() {
   const visibleTasks = filterByPeriod(tasks, period)
   const doneTasks    = tasks.filter(t => t.done)
 
-  // Add task inline
+  // Add task inline — uncontrolled input (reads from ref) to avoid re-render
+  // interference from concurrent state updates in the same page component.
   async function commitAddTask() {
-    const title = newTaskTitle.trim()
-    if (!title || !user?.id) { setAddingTask(false); setNewTaskTitle(''); return }
+    const title = (addInputRef.current?.value ?? '').trim()
+    if (!title || !user?.id) { setAddingTask(false); return }
+    // Clear immediately so a blur-triggered second call sees empty and bails.
+    if (addInputRef.current) addInputRef.current.value = ''
     const task = await addQuickTask(title, user.id, endOfWeek())
     setTasks(prev => [...prev, task])
-    setNewTaskTitle('')
     setAddingTask(false)
   }
 
   function handleAddKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') commitAddTask()
-    if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle('') }
+    if (e.key === 'Enter') { e.preventDefault(); commitAddTask() }
+    if (e.key === 'Escape') setAddingTask(false)
   }
 
   function startAdding() {
@@ -415,6 +418,21 @@ export function DashboardPage() {
         title={`${greeting()}, ${me?.name?.split(' ')[0] ?? 'there'}.`}
         sub={
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {orgPosition.length > 0 && (
+              <span className="cd-org-position">
+                {orgPosition.map((crumb, i) => (
+                  <span key={crumb.id} style={{ display: 'contents' }}>
+                    {i > 0 && <span className="cd-org-position-sep">›</span>}
+                    <span
+                      className="cd-org-position-crumb"
+                      style={crumb.levelColor ? { color: crumb.levelColor } : undefined}
+                    >
+                      {crumb.name}
+                    </span>
+                  </span>
+                ))}
+              </span>
+            )}
             <span>{`Org confidence sits at ${orgAvg}/10 · ${eyebrow ?? ''}`}</span>
             {myObjs.length === 0
               ? <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
@@ -587,8 +605,7 @@ export function DashboardPage() {
                     className="cd-input"
                     style={{ flex: 1, height: 28, fontSize: 13 }}
                     placeholder="New task title…"
-                    value={newTaskTitle}
-                    onChange={e => setNewTaskTitle(e.target.value)}
+                    defaultValue=""
                     onKeyDown={handleAddKeyDown}
                     onBlur={commitAddTask}
                   />
