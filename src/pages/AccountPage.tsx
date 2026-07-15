@@ -76,6 +76,8 @@ const NOTIF_TYPES: { type: AppNotification['type']; label: string; description: 
   { type: 'cycle_archived',   label: 'Cycle archived',     description: 'When a cycle is locked and final scores are published.' },
   { type: 'okr_unaligned',    label: 'Unaligned OKR',      description: 'When your objective has no parent link in an active cycle.' },
   { type: 'invite_accepted',  label: 'Invite accepted',    description: 'When someone you invited joins the workspace.' },
+  { type: 'comment_added',    label: 'Comment on your OKR', description: 'When someone comments on an objective or KR you own.' },
+  { type: 'task_assigned',    label: 'Task assigned to you', description: 'When a task is assigned to you on a key result.' },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────

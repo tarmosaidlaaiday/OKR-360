@@ -47,6 +47,40 @@ export const commentsService = {
       .select(SELECT)
       .single()
     if (error) throw error
+
+    // Notify the owner of the objective/KR (best-effort, fire-and-forget)
+    try {
+      let ownerId: string | null = null
+      let actionUrl = '/objectives'
+      if (input.objective_id) {
+        const { data: obj } = await supabase
+          .from('objectives').select('owner_id').eq('id', input.objective_id).single()
+        ownerId = (obj as any)?.owner_id ?? null
+        actionUrl = '/objectives'
+      } else if (input.key_result_id) {
+        const { data: kr } = await supabase
+          .from('key_results').select('owner_id').eq('id', input.key_result_id).single()
+        ownerId = (kr as any)?.owner_id ?? null
+        actionUrl = '/objectives'
+      } else if (input.kpi_id) {
+        const { data: kpi } = await supabase
+          .from('kpis').select('owner_id').eq('id', input.kpi_id).single()
+        ownerId = (kpi as any)?.owner_id ?? null
+        actionUrl = '/kpis'
+      }
+      if (ownerId && ownerId !== input.author_id) {
+        const entity = input.objective_id ? 'objective' : input.key_result_id ? 'key result' : 'KPI'
+        await supabase.rpc('send_notification', {
+          p_person_id:  ownerId,
+          p_type:       'comment_added',
+          p_title:      `New comment on your ${entity}`,
+          p_body:       input.body.length > 120 ? input.body.slice(0, 117) + '…' : input.body,
+          p_action_url: actionUrl,
+          p_metadata:   null,
+        })
+      }
+    } catch { /* best-effort — don't fail the comment creation */ }
+
     return data as unknown as Comment
   },
 

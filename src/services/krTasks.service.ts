@@ -39,7 +39,23 @@ export async function createKrTask(
     .select(SELECT)
     .single()
   if (error) throw error
-  return normalise(data)
+  const task = normalise(data)
+
+  // Notify the assignee if they're not the creator (best-effort)
+  if (assigneeId && assigneeId !== createdBy) {
+    try {
+      await supabase.rpc('send_notification', {
+        p_person_id:  assigneeId,
+        p_type:       'task_assigned',
+        p_title:      'A task was assigned to you',
+        p_body:       title,
+        p_action_url: '/objectives',
+        p_metadata:   null,
+      })
+    } catch { /* best-effort */ }
+  }
+
+  return task
 }
 
 export async function updateKrTask(

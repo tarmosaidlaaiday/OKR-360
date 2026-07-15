@@ -6,7 +6,7 @@ import type { AppNotification } from '../../types/cadence'
 
 // ── Per-type metadata ────────────────────────────────────────────────────
 
-type IconName = 'check' | 'bell' | 'alertTriangle' | 'flag' | 'retro' | 'link' | 'mail' | 'user'
+type IconName = 'check' | 'bell' | 'alertTriangle' | 'flag' | 'retro' | 'link' | 'mail' | 'user' | 'chat' | 'checkCircle'
 
 interface TypeMeta {
   icon: IconName
@@ -22,6 +22,8 @@ const TYPE_META: Record<AppNotification['type'], TypeMeta> = {
   cycle_archived:    { icon: 'retro',         color: 'var(--ok)'       },
   okr_unaligned:     { icon: 'link',          color: 'var(--warn)'     },
   invite_accepted:   { icon: 'mail',          color: 'var(--ok)'       },
+  comment_added:     { icon: 'chat',          color: 'var(--accent)'   },
+  task_assigned:     { icon: 'checkCircle',   color: 'var(--ok)'       },
 }
 
 function getTypeMeta(type: string): TypeMeta {

@@ -245,6 +245,7 @@ export interface AppNotification {
   person_id: string
   type: 'checkin_due' | 'checkin_reminder' | 'blocker_flagged' | 'nudge'
     | 'review_open' | 'cycle_archived' | 'okr_unaligned' | 'invite_accepted'
+    | 'comment_added' | 'task_assigned'
   title: string
   body: string | null
   read: boolean
