@@ -504,6 +504,21 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   const tree = buildUnitTree(units)
   const flat = flattenWithDepth(tree)
 
+  // Derive whether "+ Level above" should be enabled
+  const enabledLevels = levels.filter(l => l.enabled)
+  const rootUnits = units.filter(u => u.parent_id === null)
+  let topmostRootLevelIdx = enabledLevels.length
+  for (const u of rootUnits) {
+    const idx = enabledLevels.findIndex(l => l.id === u.level_id)
+    if (idx !== -1 && idx < topmostRootLevelIdx) topmostRootLevelIdx = idx
+  }
+  const canAddLevelAbove = rootUnits.length > 0 && topmostRootLevelIdx > 0 && topmostRootLevelIdx < enabledLevels.length
+  const addLevelAboveTitle = rootUnits.length === 0
+    ? 'Add units first'
+    : !canAddLevelAbove
+      ? 'Add another hierarchy level first under Hierarchy levels above'
+      : `Insert a new ${enabledLevels[topmostRootLevelIdx - 1]?.name ?? ''} unit above all current top-level units`
+
   useEffect(() => {
     if (addUnitOpen) {
       addRoot()
@@ -523,6 +538,39 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
       position: units.length,
     }
     onChange([...units, newUnit])
+    setPendingFocusId(newId)
+  }
+
+  function addLevelAbove() {
+    const enabledLevels = levels.filter(l => l.enabled)
+    const rootUnits = units.filter(u => u.parent_id === null)
+
+    // Find the lowest index (topmost in hierarchy) among root unit levels
+    let topmostIdx = enabledLevels.length // sentinel: no roots with known level
+    for (const u of rootUnits) {
+      const idx = enabledLevels.findIndex(l => l.id === u.level_id)
+      if (idx !== -1 && idx < topmostIdx) topmostIdx = idx
+    }
+
+    // Ancestor level is one step above (lower index) the current topmost
+    if (topmostIdx <= 0 || topmostIdx === enabledLevels.length) return
+
+    const ancestorLevel = enabledLevels[topmostIdx - 1]
+    const newId = uid()
+    const newUnit: Unit = {
+      id: newId,
+      name: 'New unit',
+      level_id: ancestorLevel.id,
+      parent_id: null,
+      position: 0,
+    }
+
+    // Reparent every current root unit under the new ancestor
+    const updatedUnits = units.map(u =>
+      u.parent_id === null ? { ...u, parent_id: newId } : u
+    )
+
+    onChange([newUnit, ...updatedUnits])
     setPendingFocusId(newId)
   }
 
@@ -697,6 +745,15 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
             onClick={() => { setShowHeaderPaste(h => !h); setPasteTarget(null) }}
           >
             ⊞ Paste list
+          </button>
+          <button
+            className="cd-btn cd-btn-secondary cd-btn-tiny"
+            type="button"
+            onClick={addLevelAbove}
+            disabled={!canAddLevelAbove}
+            title={addLevelAboveTitle}
+          >
+            ↑ Level above
           </button>
           <button className="cd-btn cd-btn-secondary cd-btn-tiny" type="button" onClick={addRoot}>
             + Add unit
