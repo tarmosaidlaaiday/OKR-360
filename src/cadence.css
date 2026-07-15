@@ -259,6 +259,7 @@ button { font-family: inherit; }
 .cd-side-foot-text { min-width: 0; flex: 1; }
 .cd-side-foot-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-side-foot-role { font-size: 11px; color: var(--ink-faint); }
+.cd-side-foot-unit { font-size: 10px; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* ─── TopBar ───────────────────────────────────────────────────────────── */
 .cd-top {
@@ -4373,6 +4374,11 @@ kbd.cd-kbd {
   margin-right: 2px;
 }
 .cd-impact-sep { color: var(--ink-faint); display: flex; align-items: center; }
+
+/* ── Org position breadcrumb (Dashboard greeting + Sidebar footer) ──────── */
+.cd-org-position { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.cd-org-position-crumb { font-size: 12px; font-weight: 500; }
+.cd-org-position-sep { font-size: 11px; color: var(--ink-faint); }
 
 /* ── Retro fields (RetroPage) ───────────────────────────────────────────── */
 .cd-retro-field { display: flex; flex-direction: column; gap: 6px; }

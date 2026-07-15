@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useOrg } from '../../context/OrgContext'
 import { useCycle } from '../../context/CycleContext'
 import { profileToPerson } from '../../lib/cadenceUtils'
+import { useMyOrgPosition } from '../../hooks/useMyOrgPosition'
 
 const MAIN_NAV = [
   { to: '/dashboard',          icon: 'dashboard'   as const, label: 'Dashboard'  },
@@ -76,6 +77,7 @@ export function Sidebar() {
   const navigate = useNavigate()
   const me = profile ? profileToPerson(profile) : null
   const { cycles, activeCycle, setActiveCycle } = useCycle()
+  const orgPosition = useMyOrgPosition()
 
   return (
     <nav className="cd-side">
@@ -120,7 +122,20 @@ export function Sidebar() {
         <Avatar person={me} size={28} />
         <div className="cd-side-foot-text">
           <div className="cd-side-foot-name">{me?.name ?? 'You'}</div>
-          <div className="cd-side-foot-role">{me?.role ?? ''}</div>
+          {orgPosition.length > 0 ? (
+            <div className="cd-side-foot-unit">
+              {orgPosition.map((crumb, i) => (
+                <span key={crumb.id}>
+                  {i > 0 && <span style={{ opacity: 0.5, margin: '0 2px' }}>›</span>}
+                  <span style={crumb.levelColor ? { color: crumb.levelColor } : undefined}>
+                    {crumb.name}
+                  </span>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="cd-side-foot-role">{me?.role ?? ''}</div>
+          )}
         </div>
         <button
           className="cd-btn-icon"
