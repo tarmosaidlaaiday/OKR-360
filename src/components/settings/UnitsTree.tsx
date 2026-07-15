@@ -424,57 +424,79 @@ interface OrgTemplatesProps {
 }
 
 function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
+  const [mode, setMode] = useState<'choice' | 'templates'>('choice')
   const enabledLevels = levels.filter(l => l.enabled)
 
-  // Match by name for the default hierarchy (Group → Company → Division → Team).
-  // Fall back gracefully if levels have been renamed or the org has fewer tiers.
-  const norm = (s: string) => s.trim().toLowerCase()
-  const companyLevel =
-    enabledLevels.find(l => norm(l.name) === 'company') ??
-    enabledLevels[Math.min(1, enabledLevels.length - 1)] ??
-    null
+  // Build a fully-nested hierarchy spanning ALL enabled levels.
+  // Intermediate levels (all except the last) each get one unit named
+  // after the level itself. The last level gets the supplied leaf names.
+  function makeHierarchy(leafNames: string[]): Unit[] {
+    if (enabledLevels.length === 0) return []
 
-  const teamLevel =
-    enabledLevels.find(l => norm(l.name) === 'team') ??
-    enabledLevels[enabledLevels.length - 1] ??
-    null
+    if (enabledLevels.length === 1) {
+      const level = enabledLevels[0]
+      return leafNames.map((name, i) => ({
+        id: uid(), name, level_id: level.id, parent_id: null, position: i,
+      }))
+    }
 
-  // If both resolve to the same level (e.g. only one level exists), root and
-  // children share a level — not ideal but not a silent wrong-level mismatch.
-  const childLevelId = teamLevel?.id ?? companyLevel?.id ?? null
+    const result: Unit[] = []
+    let parentId: string | null = null
 
-  function makeCompanyPlusTeams() {
-    const companyId = uid()
-    const company: Unit = { id: companyId, name: 'Company', level_id: companyLevel?.id ?? null, parent_id: null, position: 0 }
-    const teams = ['Team 1', 'Team 2', 'Team 3'].map((name, i) => ({
-      id: uid(), name, level_id: childLevelId, parent_id: companyId, position: i,
-    }))
-    onApply([company, ...teams])
+    for (let i = 0; i < enabledLevels.length - 1; i++) {
+      const level = enabledLevels[i]
+      const newId = uid()
+      result.push({ id: newId, name: level.name, level_id: level.id, parent_id: parentId, position: 0 })
+      parentId = newId
+    }
+
+    const lastLevel = enabledLevels[enabledLevels.length - 1]
+    leafNames.forEach((name, i) => {
+      result.push({ id: uid(), name, level_id: lastLevel.id, parent_id: parentId, position: i })
+    })
+
+    return result
   }
 
-  function makeDepartments() {
-    const companyId = uid()
-    const company: Unit = { id: companyId, name: 'Company', level_id: companyLevel?.id ?? null, parent_id: null, position: 0 }
-    const depts = ['Sales', 'Marketing', 'Engineering', 'Operations'].map((name, i) => ({
-      id: uid(), name, level_id: childLevelId, parent_id: companyId, position: i,
-    }))
-    onApply([company, ...depts])
+  const lastLevelName = enabledLevels[enabledLevels.length - 1]?.name ?? 'Unit'
+  const ancestorPath = enabledLevels.slice(0, -1).map(l => l.name).join(' → ')
+  const teamsLeafNames = [`${lastLevelName} 1`, `${lastLevelName} 2`, `${lastLevelName} 3`]
+  const deptsLeafNames = ['Sales', 'Marketing', 'Engineering', 'Operations']
+  const teamsDesc = ancestorPath ? `${ancestorPath} → ${teamsLeafNames.join(', ')}` : teamsLeafNames.join(', ')
+  const deptsDesc = ancestorPath ? `${ancestorPath} → ${deptsLeafNames.join(', ')}` : deptsLeafNames.join(', ')
+
+  if (mode === 'choice') {
+    return (
+      <div className="cd-org-method-choice">
+        <button type="button" className="cd-org-method-card" onClick={() => setMode('templates')}>
+          <span className="cd-org-method-icon">⊞</span>
+          <span className="cd-org-method-title">Use a template</span>
+          <span className="cd-org-method-desc">Start from a ready-made structure spanning all your configured levels</span>
+        </button>
+        <button type="button" className="cd-org-method-card" onClick={onBlank}>
+          <span className="cd-org-method-icon">+</span>
+          <span className="cd-org-method-title">Build step by step</span>
+          <span className="cd-org-method-desc">Add units one at a time from scratch</span>
+        </button>
+      </div>
+    )
   }
 
   return (
-    <div className="cd-org-templates">
-      <button type="button" className="cd-org-template-card" onClick={makeCompanyPlusTeams}>
-        <span className="cd-org-template-title">Company + Teams</span>
-        <span className="cd-org-template-desc">Company with Team 1, 2, 3 as sub-units</span>
+    <div>
+      <button type="button" className="cd-org-template-back" onClick={() => setMode('choice')}>
+        ← Back
       </button>
-      <button type="button" className="cd-org-template-card" onClick={makeDepartments}>
-        <span className="cd-org-template-title">Departments</span>
-        <span className="cd-org-template-desc">Company with Sales, Marketing, Engineering, Operations</span>
-      </button>
-      <button type="button" className="cd-org-template-card cd-org-template-card--blank" onClick={onBlank}>
-        <span className="cd-org-template-title">Start blank</span>
-        <span className="cd-org-template-desc">Add one empty unit to begin typing</span>
-      </button>
+      <div className="cd-org-templates">
+        <button type="button" className="cd-org-template-card" onClick={() => onApply(makeHierarchy(teamsLeafNames))}>
+          <span className="cd-org-template-title">Teams</span>
+          <span className="cd-org-template-desc">{teamsDesc}</span>
+        </button>
+        <button type="button" className="cd-org-template-card" onClick={() => onApply(makeHierarchy(deptsLeafNames))}>
+          <span className="cd-org-template-title">Departments</span>
+          <span className="cd-org-template-desc">{deptsDesc}</span>
+        </button>
+      </div>
     </div>
   )
 }
@@ -801,7 +823,6 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
               }}
               onBlank={addRoot}
             />
-            <p className="cd-empty-hint">No units yet. Choose a template above or add one manually.</p>
           </>
         ) : (
           renderRows.map((item, idx) => {
