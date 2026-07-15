@@ -160,17 +160,48 @@ ORDER BY p.proname;
 - [ ] **Storage policies path-scoped**: storage INSERT/UPDATE/DELETE policies must check `(storage.foldername(name))[1]` matches the caller's own ID or org ID — not just `bucket_id`
 - [ ] **No privilege escalation via EXECUTE**: every new function granted `EXECUTE TO authenticated` should be reviewed to confirm an authenticated user cannot use it to act on another org's data
 
-**Known-clean functions (as of 2026-07-14, post full security sweep):**
-The baseline function list was audited on 2026-07-12 (migration `20260712000001_fix_security_definer_tenant_scoping.sql`).
-Functions added or modified after that date that have been re-checked:
-- `sync_kr_on_checkin` — trigger, no caller-supplied parameters, operates on `NEW` row only ✓
-- `send_notification` — accepts `p_person_id` without org validation (intentional: cross-user notifications like blocker alerts require inserting for another person); mitigated by the fact only authenticated users can call it and `notif_insert_auth` policy allows it ✓
-- `update_checkin_streak` — accepts `p_person_id`; called client-side only for `auth.uid()` in `weeklyCheckins.service.ts` ✓
-- `handle_user_activation` — trigger on `auth.users`, no caller parameters ✓
+### WARNING: Bare `true` policies are a recurring high-probability failure mode
 
-**RLS policies added after the 2026-07-12 audit:**
-- `objective_guardrail_kpis`: read uses org-join (✓), insert validates both objective and kpi org membership (✓), delete uses org-join (✓) — no `WITH CHECK (true)` anywhere
-- `avatars` storage bucket: public read (✓ intentional, same as org-logos), write/update/delete gated on `(storage.foldername(name))[1] = auth.uid()::text` — users can only touch their own `{person_id}/` folder (✓)
+This exact class of bug — `USING (true)` or `WITH CHECK (true)` on tenant-scoped tables — has
+recurred **5 times in a single day** (2026-07-15). Treat every new migration as suspect until
+the RLS checklist is explicitly completed. The pattern is always the same:
+
+1. A migration creates a new table or policy with `USING (true)` as a "temporary" placeholder.
+2. The migration is applied. The bug is now live.
+3. A later audit catches it and a separate fix migration is required.
+
+**Never ship a migration with `USING (true)`, `WITH CHECK (true)`, or `USING (auth.role() = 'authenticated')` on a multi-tenant table.** These are not defaults — they are security vulnerabilities.
+
+---
+
+**Known-clean functions (as of 2026-07-15, post definitive security sweep):**
+
+Full audit run on 2026-07-15 (migration `20260715000003_fix_all_cross_tenant_rls.sql`).
+All 22 SECURITY DEFINER functions reviewed; 4 newly fixed:
+- `admin_upsert_membership` — now validates p_target_id and p_unit_id belong to caller's org ✓
+- `clear_must_change_password` — now validates p_target_id belongs to caller's org ✓
+- `seed_default_permissions` — now validates p_org_id = my_org_id() before seeding ✓
+- `update_checkin_streak` — now validates p_person_id belongs to caller's org ✓
+
+Functions confirmed clean (no caller-supplied IDs or org-validated):
+- `sync_kr_on_checkin` — trigger, operates on `NEW` row only ✓
+- `send_notification` — org-validates p_person_id against caller's org; drops cross-org silently ✓
+- `handle_user_activation` — trigger on `auth.users`, no caller parameters ✓
+- `my_org_id` — reads caller's own org from profiles; no parameters ✓
+
+**RLS policies audited and fixed (2026-07-15):**
+- `notifications.notif_insert_any` WITH CHECK (true) → replaced with org-scoped insert ✓
+- `objectives`: "authenticated can read all" USING (auth.role()='authenticated') → org-scoped ✓
+- `key_results`: "authenticated can read all" → org-scoped via objectives.org_id ✓
+- `checkins`: "authenticated can read all" → org-scoped via key_results→objectives chain ✓
+- `confidence_logs`: USING (true) → org-scoped via key_results→objectives chain ✓
+- `kr_tasks`: USING (true) → org-scoped via key_results→objectives chain ✓
+- `kr_scores`: USING (true) → org-scoped via cycles.org_id ✓
+- `checkin_streaks`: USING (true) → org-scoped via profiles.org_id ✓
+- `people_units`: USING (true) → org-scoped via org_id column ✓
+- `tasks`: "read all" USING (auth.role()='authenticated') → owner_id = auth.uid() ✓
+- `objective_guardrail_kpis`: no `WITH CHECK (true)` anywhere ✓
+- `avatars` storage: write/update/delete gated on caller's own folder ✓
 
 ---
 
