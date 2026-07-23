@@ -26,11 +26,3 @@ enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173"]
 
-[functions.admin-create-user]
-verify_jwt = false
-
-[functions.generate-sample-data]
-verify_jwt = false
-
-[functions.clear-sample-data]
-verify_jwt = false
