@@ -210,8 +210,17 @@ Deno.serve(async (req: Request) => {
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    console.error('[admin-create-user] error:', message)
+
+    // Don't expose auth-internal messages that let callers enumerate registered
+    // emails (e.g. Supabase returns "User already registered" verbatim).
+    const isEnumerationRisk = /already registered|already exists|email.*taken|user.*exist/i.test(message)
+    const clientMessage = isEnumerationRisk
+      ? 'Could not create user. The email may already be in use.'
+      : message
+
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: clientMessage }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
