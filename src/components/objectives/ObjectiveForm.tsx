@@ -195,14 +195,14 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
       setUnits((data ?? []) as UnitOption[])
     })
     if (isEdit && objective?.id) {
-      getGuardrailKpis(objective.id).then(setGuardrails).catch(() => {})
+      getGuardrailKpis(objective.id).then(setGuardrails).catch(console.error)
     }
   }, [open, refresh, isEdit, objective?.id])
 
   // Load KPI options for guardrail picker whenever cycle is known (create or edit)
   useEffect(() => {
     if (!cycleId) return
-    getKpisForGuardrailPicker(cycleId).then(setKpiOpts).catch(() => {})
+    getKpisForGuardrailPicker(cycleId).then(setKpiOpts).catch(console.error)
   }, [cycleId])
 
   // Re-fetch parent objectives whenever the selected cycle changes

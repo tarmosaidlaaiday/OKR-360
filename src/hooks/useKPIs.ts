@@ -12,7 +12,7 @@ export function useKPIs(cycleId: string | null) {
   const reload = useCallback(async () => {
     if (!cycleId) return
     setLoading(true)
-    const data = await getKPIs(cycleId).catch(() => [])
+    const data = await getKPIs(cycleId).catch(err => { console.error('useKPIs: getKPIs failed', err); return [] })
     setKpis(data)
     setLoading(false)
   }, [cycleId])
@@ -21,7 +21,7 @@ export function useKPIs(cycleId: string | null) {
 
   useEffect(() => {
     if (!user?.id) return
-    canCreateKPI(user.id).then(setIsAdmin).catch(() => {})
+    canCreateKPI(user.id).then(setIsAdmin).catch(err => { console.error('useKPIs: canCreateKPI failed', err); setIsAdmin(false) })
   }, [user?.id])
 
   const updateActual = useCallback(async (kpiId: string, value: number) => {

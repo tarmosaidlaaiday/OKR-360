@@ -122,7 +122,7 @@ function KPIRow({ kpi, onSave, onDelete, highlighted }: { kpi: KPI; onSave: (v: 
   useEffect(() => {
     commentsService.getByKPI(kpi.id)
       .then(c => setCommentCount(c.length))
-      .catch(() => {})
+      .catch(console.error)
   }, [kpi.id])
 
   useEffect(() => {

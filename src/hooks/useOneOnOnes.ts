@@ -50,7 +50,7 @@ export function useOneOnOnes() {
   // Load everyone the user has actual 1:1 sessions with (superset of reports/manager)
   const loadPartners = useCallback(async () => {
     if (!user?.id) return
-    getOneOnOnePartners(user.id).then(setPartners).catch(() => {})
+    getOneOnOnePartners(user.id).then(setPartners).catch(err => console.error('useOneOnOnes: getPartners failed', err))
   }, [user?.id])
 
   useEffect(() => { loadPartners() }, [loadPartners])
@@ -65,7 +65,7 @@ export function useOneOnOnes() {
   const loadSessions = useCallback(async (otherId: string) => {
     if (!user?.id) return
     setSessionsLoading(true)
-    const data = await getSessionsForPair(user.id, otherId).catch(() => [])
+    const data = await getSessionsForPair(user.id, otherId).catch(err => { console.error('useOneOnOnes: getSessions failed', err); return [] })
     setSessions(data)
 
     // Initialize openSessionId to draft on first load (ref is null).

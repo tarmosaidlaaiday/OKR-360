@@ -63,9 +63,9 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
     console.log('[OrgContext] loading, orgId from auth:', orgId)
     Promise.all([
-      getLevels().catch(() => [] as Level[]),
-      getUnits(orgId).catch(() => []),
-      getOrgSettings().catch(() => FALLBACK_SETTINGS),
+      getLevels().catch(err => { console.error('OrgContext: getLevels failed', err); return [] as Level[] }),
+      getUnits(orgId).catch(err => { console.error('OrgContext: getUnits failed', err); return [] }),
+      getOrgSettings().catch(err => { console.error('OrgContext: getOrgSettings failed', err); return FALLBACK_SETTINGS }),
       orgFetch,
     ]).then(([l, u, s, o]) => {
       console.log('[OrgContext] loaded org:', o?.id, 'levels:', l.length, 'units:', u.length)

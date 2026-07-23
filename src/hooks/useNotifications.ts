@@ -10,7 +10,7 @@ export function useNotifications() {
 
   const reload = useCallback(async () => {
     if (!user?.id) return
-    const data = await getNotifications(user.id).catch(() => [])
+    const data = await getNotifications(user.id).catch(err => { console.error('useNotifications: fetch failed', err); return [] })
     setNotifications(data)
   }, [user?.id])
 

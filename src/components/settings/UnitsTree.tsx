@@ -721,7 +721,7 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
     doRemoveMembership(personId, unitId).catch(err => {
       console.error('Failed to remove membership', err)
       // Revert: refetch to get correct state
-      listUsers().then(setAllUsers).catch(() => {})
+      listUsers().then(setAllUsers).catch(err => console.error('UnitsTree: listUsers refetch failed', err))
     })
   }
 

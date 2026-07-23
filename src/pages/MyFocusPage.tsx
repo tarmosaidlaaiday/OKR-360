@@ -140,7 +140,7 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
   }, [])
 
   useEffect(() => {
-    getKpisForKeyResult(kr.id).then(setLinkedKpis).catch(() => {})
+    getKpisForKeyResult(kr.id).then(setLinkedKpis).catch(console.error)
   }, [kr.id])
 
   function cycleStatus(task: KrTask) {
@@ -354,7 +354,7 @@ function FocusObjBlock({ obj, userId, onDeleteObj, onDeleteKr }: {
   const highlight = searchParams.get('highlight')
 
   useEffect(() => {
-    getGuardrailKpis(obj.id).then(setGuardrails).catch(() => {})
+    getGuardrailKpis(obj.id).then(setGuardrails).catch(console.error)
   }, [obj.id])
 
   useEffect(() => {

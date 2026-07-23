@@ -47,7 +47,7 @@ export function CommentThread({ objectiveId, krId, kpiId }: CommentThreadProps) 
         : commentsService.getByKR(krId!)
     fetch
       .then(data => { if (active) setComments(data) })
-      .catch(() => {})
+      .catch(err => { console.error('CommentThread: fetch failed', err) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [objectiveId, krId, kpiId])

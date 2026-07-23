@@ -732,7 +732,7 @@ function PendingApprovalsBanner({
 
   useEffect(() => {
     if (!orgId) return
-    getPendingApprovals(orgId).then(setApprovals).catch(() => {})
+    getPendingApprovals(orgId).then(setApprovals).catch(err => console.error('ApprovalQueue: fetch failed', err))
   }, [orgId])
 
   if (approvals.length === 0) return null
