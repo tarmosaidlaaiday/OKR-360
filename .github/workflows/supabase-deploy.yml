@@ -5,7 +5,7 @@ name: Deploy Supabase (migrations + edge functions)
 #
 # Required secrets (add in GitHub → Settings → Secrets and variables → Actions):
 #   SUPABASE_ACCESS_TOKEN   — personal access token from supabase.com/dashboard/account/tokens
-#   SUPABASE_PROJECT_REF    — githzeldiwxkmruhaver
+#   SUPABASE_PROJECT_REF    — your Supabase project reference (from project URL)
 
 on:
   workflow_dispatch: {}   # allow manual trigger from GitHub Actions UI
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node (for npx supabase)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install Supabase CLI
         run: npm install -g supabase
