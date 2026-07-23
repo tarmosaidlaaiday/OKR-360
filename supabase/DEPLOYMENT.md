@@ -229,9 +229,30 @@ The most common cause is an expired access token — regenerate and update the s
 
 - [ ] Migration file created in `supabase/migrations/` with timestamp prefix `YYYYMMDD_NNN_name.sql`
 - [ ] Migration uses `IF NOT EXISTS` / `OR REPLACE` throughout (idempotent)
+- [ ] Migration uses `IF NOT EXISTS` / `OR REPLACE` throughout (idempotent)
 - [ ] If adding a SECURITY DEFINER function or RLS policy: full tenant-scoping checklist above completed
 - [ ] `supabase db push --linked` run locally and output confirms 0 errors (or CI ran green)
 - [ ] `supabase migration list --linked` shows no blank `remote` entries
 - [ ] Schema drift audit query above updated to include any new tables/columns
 - [ ] If edge functions changed: `supabase functions deploy <name>` run (or CI ran green)
 - [ ] `npm run build` is clean
+
+## Frontend access-control checklist
+
+When adding a new page that should be admin-only:
+
+- [ ] The route is nested inside `<Route element={<AdminRoute />}>` in `src/App.tsx` — **RLS alone is not sufficient** because it only gates data, not the page render
+- [ ] `AdminRoute` calls `isOrgOrUnitAdmin(user.id)` (in `src/services/permissions.service.ts`) and redirects non-admins to `/dashboard`
+- [ ] No admin-only sidebar link is shown to non-admins (check the `isAdmin` guard in `Sidebar.tsx`)
+
+## Login brute-force protection
+
+The login form includes a client-side exponential backoff (UX speed bump only — disables the
+button for up to 60s after repeated failures). **This is not the real defence.**
+
+**Required Supabase dashboard setting:** Auth → Rate limits → "Failed sign-in rate limit"  
+Default is 30 per hour. For production, set this to ≤10 per hour per IP.  
+This requires a **Supabase Pro plan** (rate limiting is not available on the free tier).
+
+Without the server-side setting, a determined attacker can bypass the client-side backoff by
+calling the Supabase Auth API directly.
