@@ -4,6 +4,7 @@ import { CycleProvider } from './context/CycleContext'
 import { TweaksProvider } from './context/TweaksContext'
 import { OrgProvider } from './context/OrgContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { AdminRoute } from './components/auth/AdminRoute'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
@@ -67,7 +68,6 @@ export default function App() {
                     <Route path="/kpis"               element={<KPIsPage />} />
                     <Route path="/scorecard"          element={<ScorecardPage />} />
                     <Route path="/1on1s"              element={<OneOnOnesPage />} />
-                    <Route path="/settings/structure" element={<StructurePage />} />
                     <Route path="/my-focus"           element={<MyFocusPage />} />
                     <Route path="/my-contribution"    element={<MyContributionPage />} />
                     <Route path="/units/:id"           element={<UnitPage />} />
@@ -75,7 +75,6 @@ export default function App() {
                     <Route path="/check-in"            element={<CheckInPage />} />
                     <Route path="/check-in/team"        element={<TeamCheckinPage />} />
                     <Route path="/cascade"             element={<CascadePage />} />
-                    <Route path="/settings/users"     element={<UserManagementPage />} />
                     <Route path="/review"             element={<ReviewPage />} />
                     <Route path="/review/team"        element={<TeamReviewPage />} />
                     <Route path="/cycles"             element={<CyclesPage />} />
@@ -88,6 +87,12 @@ export default function App() {
                     <Route path="/settings/account"            element={<AccountPage />} />
                     <Route path="/retro"                       element={<RetroPage />} />
                     <Route path="/history"                     element={<HistoryPage />} />
+
+                    {/* Admin-only routes: require org-admin or unit-admin/lead role */}
+                    <Route element={<AdminRoute />}>
+                      <Route path="/settings/structure" element={<StructurePage />} />
+                      <Route path="/settings/users"     element={<UserManagementPage />} />
+                    </Route>
                   </Route>
                 </Route>
 
