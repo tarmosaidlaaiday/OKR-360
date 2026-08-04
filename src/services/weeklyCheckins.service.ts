@@ -119,12 +119,16 @@ export async function submitCheckin(input: SubmitCheckinInput): Promise<void> {
     )
   if (error) throw error
 
-  // Update streak
-  await supabase.rpc('update_checkin_streak', {
-    p_person_id: input.person_id,
-    p_week: input.week_number,
-    p_year: input.year,
-  })
+  // Update streak — non-critical: a blip here must not fail the whole submission
+  try {
+    await supabase.rpc('update_checkin_streak', {
+      p_person_id: input.person_id,
+      p_week: input.week_number,
+      p_year: input.year,
+    })
+  } catch (err) {
+    console.error('submitCheckin: streak update failed (non-fatal)', err)
+  }
 
   // Notify unit admin if blocker flagged
   if (input.has_blocker) {

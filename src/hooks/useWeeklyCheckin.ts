@@ -36,7 +36,7 @@ export function useWeeklyCheckin() {
         const existing = kr.this_week_checkin
         initialDrafts.set(kr.id, {
           new_value:    existing?.new_value   ?? kr.current_value,
-          confidence:   existing?.confidence  ?? 0,
+          confidence:   existing?.confidence  ?? 5,
           will_score:   existing?.will_score  ?? 0,
           will_action:  existing?.will_action ?? '',
           has_blocker:  existing?.has_blocker ?? false,
@@ -60,22 +60,22 @@ export function useWeeklyCheckin() {
     setDrafts(prev => {
       const next = new Map(prev)
       const existing = next.get(krId) ?? {
-        new_value: 0, confidence: 0, will_score: 0, will_action: '', has_blocker: false, blocker_text: '', note: '',
+        new_value: 0, confidence: 5, will_score: 0, will_action: '', has_blocker: false, blocker_text: '', note: '',
       }
       next.set(krId, { ...existing, ...draft })
       return next
     })
   }, [])
 
-  const submitAll = useCallback(async () => {
-    if (!user?.id || !activeCycle?.id) return
+  const submitAll = useCallback(async (): Promise<boolean> => {
+    if (!user?.id || !activeCycle?.id) return false
     setIsSubmitting(true)
     setError(null)
 
     try {
       for (const kr of krs) {
         const draft = drafts.get(kr.id)
-        if (!draft) continue
+        if (!draft) { console.warn('useWeeklyCheckin: no draft for KR', kr.id); continue }
         await submitCheckin({
           key_result_id: kr.id,
           person_id:     user.id,
@@ -94,8 +94,10 @@ export function useWeeklyCheckin() {
       const updatedStreak = await getMyStreak(user.id)
       setStreak(updatedStreak)
       setIsDone(true)
+      return true
     } catch (e) {
       setError(getErrorMessage(e))
+      return false
     } finally {
       setIsSubmitting(false)
     }

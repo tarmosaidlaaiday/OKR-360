@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useWeeklyCheckin } from '../hooks/useWeeklyCheckin'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { ProgressBar } from '../components/cadence/ProgressBar'
@@ -244,8 +244,8 @@ export function CheckInPage() {
   const currentDraft = currentKr ? drafts.get(currentKr.id) : undefined
 
   async function handleSubmit() {
-    await submitAll()
-    setSubmitted(true)
+    const ok = await submitAll()
+    if (ok) setSubmitted(true)
   }
 
   function handleNext() {
@@ -280,6 +280,10 @@ export function CheckInPage() {
             <div className="cd-checkin-success-title">All done for week {week}</div>
             <div className="cd-checkin-success-sub">You've already checked in all your KRs this week.</div>
             <StreakBadge streak={streak} />
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <Link to="/objectives" className="cd-btn">View OKRs</Link>
+              <Link to="/check-in/team" className="cd-btn cd-btn-primary">Team status</Link>
+            </div>
           </div>
         </div>
       </div>

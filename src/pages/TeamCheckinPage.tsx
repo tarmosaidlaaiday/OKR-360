@@ -131,7 +131,7 @@ export function TeamCheckinPage() {
             <div key={i} className="cd-team-ci-blocker-row">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                 <Avatar
-                  person={b.person ? profileToPerson({ id: 'unknown', full_name: b.person.full_name, avatar_url: b.person.avatar_url, role: null }) : null}
+                  person={b.person ? profileToPerson({ id: b.person.id, full_name: b.person.full_name, avatar_url: b.person.avatar_url, role: null }) : null}
                   size={18}
                 />
                 <span className="cd-team-ci-blocker-kr">{b.kr_title}</span>
