@@ -221,7 +221,7 @@ function SuccessScreen({ krs, drafts, streak }: {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" className="cd-btn" onClick={() => navigate('/okrs')}>
+        <button type="button" className="cd-btn" onClick={() => navigate('/objectives')}>
           View OKRs
         </button>
         <button type="button" className="cd-btn cd-btn-primary" onClick={() => navigate('/check-in/team')}>
@@ -265,7 +265,10 @@ export function CheckInPage() {
     return (
       <div className="cd-page">
         <PageHeader title="Check in" sub={`Week ${week}`} />
-        <p className="cd-empty-hint">No key results assigned to you for this cycle.</p>
+        {error
+          ? <p style={{ color: 'var(--bad)', fontSize: 13 }}>{error}</p>
+          : <p className="cd-empty-hint">No key results assigned to you for this cycle.</p>
+        }
       </div>
     )
   }

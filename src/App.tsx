@@ -38,6 +38,7 @@ import { AccountPage } from './pages/AccountPage'
 import { RetroPage } from './pages/RetroPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { PendingApprovalPage } from './pages/PendingApprovalPage'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
   return (
@@ -63,12 +64,13 @@ export default function App() {
 
                 {/* Protected routes inside AppShell */}
                 <Route element={<ProtectedRoute />}>
-                  <Route element={<AppShell />}>
+                  <Route element={<ErrorBoundary><AppShell /></ErrorBoundary>}>
                     <Route path="/dashboard"          element={<DashboardPage />} />
                     <Route path="/kpis"               element={<KPIsPage />} />
                     <Route path="/scorecard"          element={<ScorecardPage />} />
                     <Route path="/1on1s"              element={<OneOnOnesPage />} />
                     <Route path="/my-focus"           element={<MyFocusPage />} />
+                    <Route path="/focus"              element={<MyFocusPage />} />
                     <Route path="/my-contribution"    element={<MyContributionPage />} />
                     <Route path="/units/:id"           element={<UnitPage />} />
                     <Route path="/settings/my-units"   element={<MyUnitsPage />} />

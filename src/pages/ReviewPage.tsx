@@ -209,7 +209,7 @@ function CompletionScreen({
       )}
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" className="cd-btn" onClick={() => navigate('/okrs')}>View OKRs</button>
+        <button type="button" className="cd-btn" onClick={() => navigate('/objectives')}>View OKRs</button>
         <button type="button" className="cd-btn cd-btn-primary" onClick={() => navigate('/dashboard')}>
           Dashboard
         </button>

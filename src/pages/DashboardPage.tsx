@@ -78,7 +78,7 @@ function ObjectiveRow({
     <a
       className="cd-obj-row"
       href="#"
-      onClick={e => { e.preventDefault(); navigate('/okrs') }}
+      onClick={e => { e.preventDefault(); navigate('/focus?highlight=' + o.id) }}
     >
       <div className="cd-obj-conf">
         <ConfidenceCell value={conf} size={32} />
@@ -151,17 +151,6 @@ function TaskRow({
   )
 }
 
-function RetroCol({ label, tone, items }: { label: string; tone: string; items: string[] }) {
-  return (
-    <div className={`cd-retro-col cd-retro-${tone}`}>
-      <div className="cd-retro-lbl">{label}</div>
-      <ul>
-        {items.map((it, i) => <li key={i}>{it}</li>)}
-      </ul>
-    </div>
-  )
-}
-
 function ImpactStrip({ objectiveId }: { objectiveId: string | null }) {
   const { chain } = useCascadeChain(objectiveId)
   if (chain.length < 2) return null
@@ -211,16 +200,6 @@ function HappinessTrack({ values }: { values: (number | null)[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────
 
-interface Retro {
-  id: string
-  unit_id: string
-  week_number: number
-  year: number
-  start_items: string[]
-  stop_items: string[]
-  continue_items: string[]
-}
-
 export function DashboardPage() {
   usePageTitle('Dashboard')
   const orgPosition    = useMyOrgPosition()
@@ -239,8 +218,6 @@ export function DashboardPage() {
   const [nextMeeting, setNextMeeting]   = useState<OneOnOne | null>(null)
   const [lastMeeting, setLastMeeting]   = useState<OneOnOne | null>(null)
   const [happinessVals, setHappiness]   = useState<(number | null)[]>([])
-  const [retro, setRetro]               = useState<Retro | null>(null)
-  const [primaryUnit, setPrimaryUnit]   = useState<{ id: string; name: string } | null>(null)
   const [hasCheckedIn, setHasCheckedIn] = useState(false)
   const [orgAvg, setOrgAvg]             = useState<string>('—')
   const [addingTask, setAddingTask] = useState(false)
@@ -331,33 +308,7 @@ export function DashboardPage() {
       .limit(1)
       .then(({ data }) => setHasCheckedIn((data ?? []).length > 0))
 
-    // Primary unit
-    supabase
-      .from('people_units')
-      .select('unit_id, unit:units(id, name)')
-      .eq('person_id', user.id)
-      .eq('is_primary', true)
-      .limit(1)
-      .then(({ data }) => {
-        const row = (data ?? [])[0] as any
-        if (row?.unit) setPrimaryUnit(row.unit)
-      })
   }, [user?.id])
-
-  // Retro — load once we know the primary unit
-  useEffect(() => {
-    if (!primaryUnit) return
-    const prevWeek = getISOWeek(new Date()) - 1
-    const year = new Date().getFullYear()
-    supabase
-      .from('retros')
-      .select('*')
-      .eq('unit_id', primaryUnit.id)
-      .eq('year', prevWeek <= 0 ? year - 1 : year)
-      .order('week_number', { ascending: false })
-      .limit(1)
-      .then(({ data }) => setRetro((data ?? [])[0] as Retro ?? null))
-  }, [primaryUnit])
 
   // Computed for the eyebrow — use cycle start/end dates for accuracy
   const weeksInQ = activeCycle?.start_date && activeCycle?.end_date
@@ -494,14 +445,14 @@ export function DashboardPage() {
 
       <div className="cd-grid">
 
-        {/* ── My objectives ─────────────────────────────────────── span 8 */}
-        <div className="cd-span-8">
+        {/* ── My objectives ──────────────────────────────────── full width */}
+        <div className="cd-span-12">
           <Card>
             <CardHeader
               title="My objectives & key results"
               sub="Where I'm accountable"
               action={
-                <a className="cd-link" href="#" onClick={e => { e.preventDefault(); navigate('/okrs') }}>
+                <a className="cd-link" href="#" onClick={e => { e.preventDefault(); navigate('/focus') }}>
                   View all <Icon name="chevronR" size={12} />
                 </a>
               }
@@ -617,39 +568,6 @@ export function DashboardPage() {
                 </li>
               )}
             </ul>
-          </Card>
-        </div>
-
-        {/* ── Retro ─────────────────────────────────────────────── span 5 */}
-        <div className="cd-span-5">
-          <Card>
-            <CardHeader
-              title="Last week's retro"
-              sub={retro ? `${primaryUnit?.name ?? 'Team'} · W${retro.week_number}` : (primaryUnit?.name ?? 'Team')}
-              action={
-                <a
-                  className="cd-link"
-                  href="#"
-                  onClick={e => { e.preventDefault(); navigate('/retro') }}
-                >
-                  Open <Icon name="chevronR" size={12} />
-                </a>
-              }
-            />
-            {retro ? (
-              <div className="cd-retro">
-                <RetroCol label="Start"    tone="ok"   items={retro.start_items.slice(0, 2)} />
-                <RetroCol label="Stop"     tone="bad"  items={retro.stop_items.slice(0, 2)} />
-                <RetroCol label="Continue" tone="warm" items={retro.continue_items.slice(0, 2)} />
-              </div>
-            ) : (
-              <div className="cd-empty" style={{ padding: '16px 0', flexDirection: 'column', gap: 10 }}>
-                <span>No retro last week.</span>
-                <button className="cd-btn cd-btn-secondary" onClick={() => navigate('/retro')}>
-                  Start retro
-                </button>
-              </div>
-            )}
           </Card>
         </div>
 
