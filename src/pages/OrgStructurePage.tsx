@@ -94,18 +94,41 @@ export function OrgStructurePage() {
       }
 
       // Before saving existing units, remap any parent_id that points at a
-      // temp id (e.g. an existing unit reparented under a brand-new ancestor).
+      // temp id (e.g. an existing unit reparented under a brand-new ancestor),
+      // and nullify any level_id that is not a valid UUID (stale fallback
+      // placeholder values like 'group' or 'company' from OrgContext defaults).
       const remappedExistingUnits = existingUnits.map(u => {
-        if (u.parent_id === null || UUID_RE.test(u.parent_id)) return u
-        const resolved = tempToReal.get(u.parent_id)
-        if (!resolved) {
-          throw new Error(`Unit "${u.name}": parent_id "${u.parent_id}" is a temp id but was not inserted in this save`)
+        let out = u
+        // Remap temp parent_id to real UUID
+        if (out.parent_id !== null && !UUID_RE.test(out.parent_id)) {
+          const resolved = tempToReal.get(out.parent_id)
+          if (!resolved) {
+            throw new Error(`Unit "${u.name}": parent_id "${u.parent_id}" is a temp id but was not inserted in this save`)
+          }
+          if (!UUID_RE.test(resolved)) {
+            throw new Error(`Unit "${u.name}": resolved parent_id "${resolved}" is not a valid UUID`)
+          }
+          out = { ...out, parent_id: resolved }
         }
-        if (!UUID_RE.test(resolved)) {
-          throw new Error(`Unit "${u.name}": resolved parent_id "${resolved}" is not a valid UUID`)
+        // Nullify stale placeholder level_id values (e.g. 'group', 'company')
+        // that predate real levels being configured — same guard already applied
+        // to new units in the insertion loop above.
+        if (out.level_id != null && !UUID_RE.test(out.level_id)) {
+          out = { ...out, level_id: null }
         }
-        return { ...u, parent_id: resolved }
+        return out
       })
+
+      // Final safety net: catch any remaining invalid field values before they
+      // reach the DB and produce a cryptic Postgres UUID type error.
+      for (const u of remappedExistingUnits) {
+        if (u.parent_id !== null && !UUID_RE.test(u.parent_id)) {
+          throw new Error(`Unit "${u.name}": parent_id "${u.parent_id}" is not a valid UUID — cannot save`)
+        }
+        if (u.level_id != null && !UUID_RE.test(u.level_id)) {
+          throw new Error(`Unit "${u.name}": level_id "${u.level_id}" is not a valid UUID — cannot save`)
+        }
+      }
       if (remappedExistingUnits.length) await saveUnits(remappedExistingUnits)
 
       // Settings
