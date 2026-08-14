@@ -1,6 +1,11 @@
 import { supabase } from '../lib/supabase'
 import type { KrTargetType } from '../types'
 
+export interface OrgTreeNode {
+  name: string
+  children: OrgTreeNode[]
+}
+
 export interface KRSuggestion {
   title: string
   target_type: KrTargetType
@@ -29,4 +34,23 @@ export async function suggestKRs(
   const json = await resp.json()
   if (!resp.ok) throw new Error(json.error ?? 'AI suggestion failed')
   return json.suggestions as KRSuggestion[]
+}
+
+export async function suggestOrgStructure(description: string): Promise<OrgTreeNode[]> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Not authenticated')
+
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-org-structure`
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ description }),
+  })
+
+  const json = await resp.json()
+  if (!resp.ok) throw new Error(json.error ?? 'AI suggestion failed')
+  return json.units as OrgTreeNode[]
 }
