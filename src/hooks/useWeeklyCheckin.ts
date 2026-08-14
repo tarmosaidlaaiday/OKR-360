@@ -51,6 +51,7 @@ export function useWeeklyCheckin() {
       setIsDone(allDone)
     }).catch(err => {
       console.error(err)
+      setError(getErrorMessage(err))
     }).finally(() => {
       setLoading(false)
     })
