@@ -56,12 +56,57 @@ export function OrgStructurePage() {
       const existingUnits = draftUnits.filter(u => !u.id.startsWith('new_'))
       const newUnits = draftUnits.filter(u => u.id.startsWith('new_'))
 
-      if (existingUnits.length) await saveUnits(existingUnits)
-      for (const u of newUnits) {
-        // Nullify any fallback level_id (non-UUID) to avoid FK type errors
-        const levelId = UUID_RE.test(u.level_id ?? '') ? u.level_id : null
-        await createUnit({ name: u.name, level_id: levelId, parent_id: u.parent_id, position: u.position, org_id: org?.id })
+      // Insert new units in dependency order, resolving temp IDs to real UUIDs.
+      // A new unit can only be inserted once its parent (if also new) has been
+      // inserted and its real id is known.
+      const tempToReal = new Map<string, string>()
+      const resolveParentId = (parentId: string | null): string | null => {
+        if (parentId === null) return null
+        if (tempToReal.has(parentId)) return tempToReal.get(parentId)!
+        if (UUID_RE.test(parentId)) return parentId
+        throw new Error(`Cannot resolve parent_id "${parentId}" — no matching inserted unit found`)
       }
+      const pending = [...newUnits]
+      while (pending.length > 0) {
+        const before = pending.length
+        for (let i = pending.length - 1; i >= 0; i--) {
+          const u = pending[i]
+          // Check whether this unit's parent_id is resolvable right now
+          const parentIsNull = u.parent_id === null
+          const parentIsRealUUID = u.parent_id !== null && UUID_RE.test(u.parent_id)
+          const parentIsResolved = u.parent_id !== null && tempToReal.has(u.parent_id)
+          if (!parentIsNull && !parentIsRealUUID && !parentIsResolved) continue
+
+          const levelId = UUID_RE.test(u.level_id ?? '') ? u.level_id : null
+          const parentId = resolveParentId(u.parent_id ?? null)
+          if (parentId !== null && !UUID_RE.test(parentId)) {
+            throw new Error(`Unit "${u.name}": resolved parent_id "${parentId}" is not a valid UUID`)
+          }
+          const created = await createUnit({ name: u.name, level_id: levelId, parent_id: parentId, position: u.position, org_id: org?.id })
+          tempToReal.set(u.id, created.id)
+          pending.splice(i, 1)
+        }
+        if (pending.length === before) {
+          // No progress — cycle or orphaned reference in new units
+          const names = pending.map(u => `"${u.name}" (parent_id: ${u.parent_id})`).join(', ')
+          throw new Error(`Could not resolve parent references for new units: ${names}`)
+        }
+      }
+
+      // Before saving existing units, remap any parent_id that points at a
+      // temp id (e.g. an existing unit reparented under a brand-new ancestor).
+      const remappedExistingUnits = existingUnits.map(u => {
+        if (u.parent_id === null || UUID_RE.test(u.parent_id)) return u
+        const resolved = tempToReal.get(u.parent_id)
+        if (!resolved) {
+          throw new Error(`Unit "${u.name}": parent_id "${u.parent_id}" is a temp id but was not inserted in this save`)
+        }
+        if (!UUID_RE.test(resolved)) {
+          throw new Error(`Unit "${u.name}": resolved parent_id "${resolved}" is not a valid UUID`)
+        }
+        return { ...u, parent_id: resolved }
+      })
+      if (remappedExistingUnits.length) await saveUnits(remappedExistingUnits)
 
       // Settings
       await saveOrgSettings(draftSettings)
