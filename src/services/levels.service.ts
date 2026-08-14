@@ -18,6 +18,16 @@ export async function saveLevels(levels: Level[]): Promise<void> {
   if (error) throw error
 }
 
+export async function createLevel(level: Omit<Level, 'id'>): Promise<Level> {
+  const { data, error } = await supabase
+    .from('levels')
+    .insert(level)
+    .select()
+    .single()
+  if (error) throw new Error(`Level insert failed: ${error.message}`)
+  return data as Level
+}
+
 export async function deleteLevel(id: string): Promise<void> {
   const { error } = await supabase.from('levels').delete().eq('id', id)
   if (error) throw error

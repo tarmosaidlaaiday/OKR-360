@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Level, Unit } from '../../types/cadence'
+import type { Unit } from '../../types/cadence'
+import { LEVEL_COLORS } from '../../types/cadence'
 import { usePageActionStore } from '../../stores/pageActionStore'
 import {
   listUsers,
@@ -8,6 +9,8 @@ import {
   removeMembership as doRemoveMembership,
 } from '../../services/userManagement.service'
 import type { ManagedUser, UnitRole } from '../../services/userManagement.service'
+import { suggestOrgStructure } from '../../services/aiSuggestions.service'
+import type { OrgTreeNode } from '../../services/aiSuggestions.service'
 
 // ── uid helper ────────────────────────────────────────────────────────────
 let _uidSeq = 0
@@ -83,10 +86,8 @@ function UnitMembersPicker({
   const wrapRef = useRef<HTMLDivElement>(null)
   const isNew = unitId.startsWith('new_')
 
-  // Members of this unit
   const members = allUsers.filter(u => u.memberships.some(m => m.unit_id === unitId))
 
-  // Click-outside to close
   useEffect(() => {
     if (!open) return
     function handler(e: MouseEvent) {
@@ -106,7 +107,6 @@ function UnitMembersPicker({
     setSearch('')
   }
 
-  // Avatar stack
   const avatarSlots = members.slice(0, 3)
   const extra = members.length - 3
 
@@ -254,16 +254,13 @@ function PastePopover({ onCreate, onClose }: PastePopoverProps) {
 
 interface UnitRowProps {
   unit: UnitNodeData
-  levels: Level[]
-  levelFilter: string | null
   initEditing: boolean
   onFocusConsumed: () => void
-  onAddChild: (parentId: string, parentLevelId: string | null) => void
-  onAddSibling: (parentId: string | null, parentLevelId: string | null) => void
+  onAddChild: (parentId: string) => void
+  onAddSibling: (parentId: string | null) => void
   onDelete: (id: string) => void
   onRename: (id: string, name: string) => void
-  onChangeLevel: (id: string, levelId: string) => void
-  onPasteForUnit: (parentId: string | null, levelId: string | null) => void
+  onPasteForUnit: (parentId: string | null) => void
   allUsers: ManagedUser[]
   loadingUsers: boolean
   onUsersOpen: () => void
@@ -274,15 +271,12 @@ interface UnitRowProps {
 
 function UnitRow({
   unit,
-  levels,
-  levelFilter,
   initEditing,
   onFocusConsumed,
   onAddChild,
   onAddSibling,
   onDelete,
   onRename,
-  onChangeLevel,
   onPasteForUnit,
   allUsers,
   loadingUsers,
@@ -293,9 +287,8 @@ function UnitRow({
 }: UnitRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(unit.name)
-  const level = levels.find(l => l.id === unit.level_id)
+  const dotColor = LEVEL_COLORS[Math.min(unit.depth, LEVEL_COLORS.length - 1)]
 
-  // Auto-enter edit mode when initEditing is set
   useEffect(() => {
     if (initEditing) {
       setEditing(true)
@@ -318,14 +311,11 @@ function UnitRow({
       const committed = draft.trim() || unit.name
       onRename(unit.id, committed)
       setEditing(false)
-      // Create a sibling at the same level/parent
-      onAddSibling(unit.parent_id, unit.level_id)
+      onAddSibling(unit.parent_id)
     } else if (e.key === 'Escape') {
       commitName()
     }
   }
-
-  if (levelFilter && unit.level_id !== levelFilter) return null
 
   return (
     <div
@@ -337,11 +327,11 @@ function UnitRow({
         style={{ left: 12 + (unit.depth - 1) * 20, display: unit.depth > 0 ? undefined : 'none' }}
       />
 
-      {/* Level dot */}
+      {/* Depth color dot */}
       <span
         className="cd-unit-dot"
-        style={{ background: level?.color ?? 'var(--ink-faint)' }}
-        title={level?.name}
+        style={{ background: dotColor }}
+        title={`Depth ${unit.depth}`}
       />
 
       {/* Name */}
@@ -371,24 +361,12 @@ function UnitRow({
         onInvite={onInvite}
       />
 
-      {/* Level selector */}
-      <select
-        className="cd-unit-level-select"
-        value={unit.level_id ?? ''}
-        onChange={e => onChangeLevel(unit.id, e.target.value)}
-      >
-        <option value="">No level</option>
-        {levels.filter(l => l.enabled).map(l => (
-          <option key={l.id} value={l.id}>{l.name}</option>
-        ))}
-      </select>
-
       {/* Actions */}
       <div className="cd-unit-actions">
         <button
           type="button"
           className="cd-unit-action"
-          onClick={() => onPasteForUnit(unit.parent_id, unit.level_id)}
+          onClick={() => onPasteForUnit(unit.parent_id)}
           title="Bulk paste sibling units"
         >
           ⊞ paste
@@ -396,7 +374,7 @@ function UnitRow({
         <button
           type="button"
           className="cd-unit-action"
-          onClick={() => onAddChild(unit.id, unit.level_id)}
+          onClick={() => onAddChild(unit.id)}
           title="Add child unit"
         >
           + child
@@ -418,52 +396,57 @@ function UnitRow({
 // ── Starter templates ─────────────────────────────────────────────────────
 
 interface OrgTemplatesProps {
-  levels: Level[]
   onApply: (units: Unit[]) => void
   onBlank: () => void
 }
 
-function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
-  const [mode, setMode] = useState<'choice' | 'templates'>('choice')
-  const enabledLevels = levels.filter(l => l.enabled)
+/** Convert a recursive AI tree into a flat Unit[] using temp ids. */
+function treeToUnits(nodes: OrgTreeNode[], parentId: string | null = null, counter = { n: 0 }): Unit[] {
+  const result: Unit[] = []
+  for (const node of nodes) {
+    const id = uid()
+    result.push({ id, name: node.name, level_id: null, parent_id: parentId, position: counter.n++ })
+    if (node.children?.length) {
+      result.push(...treeToUnits(node.children, id, counter))
+    }
+  }
+  return result
+}
 
-  // Build a fully-nested hierarchy spanning ALL enabled levels.
-  // Intermediate levels (all except the last) each get one unit named
-  // after the level itself. The last level gets the supplied leaf names.
+function OrgTemplates({ onApply, onBlank }: OrgTemplatesProps) {
+  const [mode, setMode] = useState<'choice' | 'templates' | 'ai'>('choice')
+  const [aiDescription, setAiDescription] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  /** Build a simple two-level structure: one root named "Company" with leaves as children. */
   function makeHierarchy(leafNames: string[]): Unit[] {
-    if (enabledLevels.length === 0) return []
-
-    if (enabledLevels.length === 1) {
-      const level = enabledLevels[0]
-      return leafNames.map((name, i) => ({
-        id: uid(), name, level_id: level.id, parent_id: null, position: i,
-      }))
-    }
-
-    const result: Unit[] = []
-    let parentId: string | null = null
-
-    for (let i = 0; i < enabledLevels.length - 1; i++) {
-      const level = enabledLevels[i]
-      const newId = uid()
-      result.push({ id: newId, name: level.name, level_id: level.id, parent_id: parentId, position: 0 })
-      parentId = newId
-    }
-
-    const lastLevel = enabledLevels[enabledLevels.length - 1]
-    leafNames.forEach((name, i) => {
-      result.push({ id: uid(), name, level_id: lastLevel.id, parent_id: parentId, position: i })
-    })
-
-    return result
+    const rootId = uid()
+    const root: Unit = { id: rootId, name: 'Company', level_id: null, parent_id: null, position: 0 }
+    const leaves: Unit[] = leafNames.map((name, i) => ({
+      id: uid(), name, level_id: null, parent_id: rootId, position: i,
+    }))
+    return [root, ...leaves]
   }
 
-  const lastLevelName = enabledLevels[enabledLevels.length - 1]?.name ?? 'Unit'
-  const ancestorPath = enabledLevels.slice(0, -1).map(l => l.name).join(' → ')
-  const teamsLeafNames = [`${lastLevelName} 1`, `${lastLevelName} 2`, `${lastLevelName} 3`]
-  const deptsLeafNames = ['Sales', 'Marketing', 'Engineering', 'Operations']
-  const teamsDesc = ancestorPath ? `${ancestorPath} → ${teamsLeafNames.join(', ')}` : teamsLeafNames.join(', ')
-  const deptsDesc = ancestorPath ? `${ancestorPath} → ${deptsLeafNames.join(', ')}` : deptsLeafNames.join(', ')
+  async function handleGenerate() {
+    if (!aiDescription.trim()) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const nodes = await suggestOrgStructure(aiDescription)
+      const units = treeToUnits(nodes)
+      if (units.length === 0) {
+        setAiError('The AI returned an empty structure. Try a more detailed description.')
+        return
+      }
+      onApply(units)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI suggestion failed')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   if (mode === 'choice') {
     return (
@@ -471,7 +454,16 @@ function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
         <button type="button" className="cd-org-method-card" onClick={() => setMode('templates')}>
           <span className="cd-org-method-icon">⊞</span>
           <span className="cd-org-method-title">Use a template</span>
-          <span className="cd-org-method-desc">Start from a ready-made structure spanning all your configured levels</span>
+          <span className="cd-org-method-desc">Start from a ready-made structure</span>
+        </button>
+        <button
+          type="button"
+          className="cd-org-method-card"
+          onClick={() => { setAiError(null); setAiDescription(''); setMode('ai') }}
+        >
+          <span className="cd-org-method-icon">✦</span>
+          <span className="cd-org-method-title">Describe your company</span>
+          <span className="cd-org-method-desc">Let AI generate a structure from a plain-language description</span>
         </button>
         <button type="button" className="cd-org-method-card" onClick={onBlank}>
           <span className="cd-org-method-icon">+</span>
@@ -482,19 +474,62 @@ function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
     )
   }
 
+  if (mode === 'ai') {
+    return (
+      <div>
+        <button type="button" className="cd-org-template-back" onClick={() => setMode('choice')}>
+          ← Back
+        </button>
+        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 8px' }}>
+          Describe your company's structure in plain language. The AI will build a draft you can edit before saving.
+        </p>
+        <textarea
+          className="cd-paste-textarea"
+          rows={4}
+          placeholder="e.g. We're a 40-person marketing agency with Creative, Client Services, and Operations departments. Creative has Design and Copywriting teams."
+          value={aiDescription}
+          onChange={e => setAiDescription(e.target.value)}
+          disabled={aiLoading}
+        />
+        {aiError && (
+          <p style={{ fontSize: 13, color: 'var(--bad)', margin: '6px 0 0' }}>{aiError}</p>
+        )}
+        <div className="cd-paste-actions" style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            className="cd-btn cd-btn-primary cd-btn-tiny"
+            onClick={handleGenerate}
+            disabled={!aiDescription.trim() || aiLoading}
+          >
+            {aiLoading ? 'Generating…' : 'Generate structure'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // mode === 'templates'
   return (
     <div>
       <button type="button" className="cd-org-template-back" onClick={() => setMode('choice')}>
         ← Back
       </button>
       <div className="cd-org-templates">
-        <button type="button" className="cd-org-template-card" onClick={() => onApply(makeHierarchy(teamsLeafNames))}>
+        <button
+          type="button"
+          className="cd-org-template-card"
+          onClick={() => onApply(makeHierarchy(['Team 1', 'Team 2', 'Team 3']))}
+        >
           <span className="cd-org-template-title">Teams</span>
-          <span className="cd-org-template-desc">{teamsDesc}</span>
+          <span className="cd-org-template-desc">Company → Team 1, Team 2, Team 3</span>
         </button>
-        <button type="button" className="cd-org-template-card" onClick={() => onApply(makeHierarchy(deptsLeafNames))}>
+        <button
+          type="button"
+          className="cd-org-template-card"
+          onClick={() => onApply(makeHierarchy(['Sales', 'Marketing', 'Engineering', 'Operations']))}
+        >
           <span className="cd-org-template-title">Departments</span>
-          <span className="cd-org-template-desc">{deptsDesc}</span>
+          <span className="cd-org-template-desc">Company → Sales, Marketing, Engineering, Operations</span>
         </button>
       </div>
     </div>
@@ -505,15 +540,13 @@ function OrgTemplates({ levels, onApply, onBlank }: OrgTemplatesProps) {
 
 interface UnitsTreeProps {
   units: Unit[]
-  levels: Level[]
   onChange: (units: Unit[]) => void
 }
 
-export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
+export function UnitsTree({ units, onChange }: UnitsTreeProps) {
   const navigate = useNavigate()
-  const [levelFilter, setLevelFilter] = useState<string | null>(null)
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null)
-  const [pasteTarget, setPasteTarget] = useState<{ parentId: string | null; levelId: string | null } | null>(null)
+  const [pasteTarget, setPasteTarget] = useState<{ parentId: string | null } | null>(null)
   const [showHeaderPaste, setShowHeaderPaste] = useState(false)
 
   // User data for picker (lazy loaded)
@@ -526,20 +559,10 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   const tree = buildUnitTree(units)
   const flat = flattenWithDepth(tree)
 
-  // Derive whether "+ Level above" should be enabled
-  const enabledLevels = levels.filter(l => l.enabled)
+  // "+ Level above" is available as long as there are existing root units to
+  // reparent. The new ancestor's level_id is auto-derived from depth on save.
   const rootUnits = units.filter(u => u.parent_id === null)
-  let topmostRootLevelIdx = enabledLevels.length
-  for (const u of rootUnits) {
-    const idx = enabledLevels.findIndex(l => l.id === u.level_id)
-    if (idx !== -1 && idx < topmostRootLevelIdx) topmostRootLevelIdx = idx
-  }
-  const canAddLevelAbove = rootUnits.length > 0 && topmostRootLevelIdx > 0 && topmostRootLevelIdx < enabledLevels.length
-  const addLevelAboveTitle = rootUnits.length === 0
-    ? 'Add units first'
-    : !canAddLevelAbove
-      ? 'Add another hierarchy level first under Hierarchy levels above'
-      : `Insert a new ${enabledLevels[topmostRootLevelIdx - 1]?.name ?? ''} unit above all current top-level units`
+  const canAddLevelAbove = rootUnits.length > 0
 
   useEffect(() => {
     if (addUnitOpen) {
@@ -550,12 +573,11 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   }, [addUnitOpen])
 
   function addRoot() {
-    const topLevel = levels.filter(l => l.enabled)[0] ?? null
     const newId = uid()
     const newUnit: Unit = {
       id: newId,
       name: 'New unit',
-      level_id: topLevel?.id ?? null,
+      level_id: null, // auto-assigned on save based on depth
       parent_id: null,
       position: units.length,
     }
@@ -564,46 +586,29 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   }
 
   function addLevelAbove() {
-    const enabledLevels = levels.filter(l => l.enabled)
-    const rootUnits = units.filter(u => u.parent_id === null)
-
-    // Find the lowest index (topmost in hierarchy) among root unit levels
-    let topmostIdx = enabledLevels.length // sentinel: no roots with known level
-    for (const u of rootUnits) {
-      const idx = enabledLevels.findIndex(l => l.id === u.level_id)
-      if (idx !== -1 && idx < topmostIdx) topmostIdx = idx
-    }
-
-    // Ancestor level is one step above (lower index) the current topmost
-    if (topmostIdx <= 0 || topmostIdx === enabledLevels.length) return
-
-    const ancestorLevel = enabledLevels[topmostIdx - 1]
+    if (!canAddLevelAbove) return
     const newId = uid()
     const newUnit: Unit = {
       id: newId,
       name: 'New unit',
-      level_id: ancestorLevel.id,
+      level_id: null, // auto-assigned on save based on depth
       parent_id: null,
       position: 0,
     }
-
     // Reparent every current root unit under the new ancestor
     const updatedUnits = units.map(u =>
       u.parent_id === null ? { ...u, parent_id: newId } : u
     )
-
     onChange([newUnit, ...updatedUnits])
     setPendingFocusId(newId)
   }
 
-  function addChild(parentId: string, parentLevelId: string | null) {
-    const parentLevelIdx = levels.findIndex(l => l.id === parentLevelId)
-    const childLevel = parentLevelIdx >= 0 ? levels[parentLevelIdx + 1] ?? null : null
+  function addChild(parentId: string) {
     const newId = uid()
     const newUnit: Unit = {
       id: newId,
       name: 'New unit',
-      level_id: childLevel?.id ?? parentLevelId,
+      level_id: null, // auto-assigned on save based on depth
       parent_id: parentId,
       position: units.filter(u => u.parent_id === parentId).length,
     }
@@ -611,12 +616,12 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
     setPendingFocusId(newId)
   }
 
-  function addSibling(parentId: string | null, levelId: string | null) {
+  function addSibling(parentId: string | null) {
     const newId = uid()
     const newUnit: Unit = {
       id: newId,
       name: 'New unit',
-      level_id: levelId,
+      level_id: null, // auto-assigned on save based on depth
       parent_id: parentId,
       position: units.filter(u => u.parent_id === parentId).length,
     }
@@ -636,24 +641,20 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
     onChange(units.map(u => u.id === id ? { ...u, name } : u))
   }
 
-  function changeLevel(id: string, levelId: string) {
-    onChange(units.map(u => u.id === id ? { ...u, level_id: levelId || null } : u))
-  }
-
   // Paste handlers
-  function handlePasteForUnit(parentId: string | null, levelId: string | null) {
+  function handlePasteForUnit(parentId: string | null) {
     setShowHeaderPaste(false)
     setPasteTarget(prev =>
-      prev?.parentId === parentId ? null : { parentId, levelId }
+      prev?.parentId === parentId ? null : { parentId }
     )
   }
 
-  function handlePasteCreate(names: string[], parentId: string | null, levelId: string | null) {
+  function handlePasteCreate(names: string[], parentId: string | null) {
     const position0 = units.filter(u => u.parent_id === parentId).length
     const newUnits: Unit[] = names.map((name, i) => ({
       id: uid(),
       name,
-      level_id: levelId,
+      level_id: null,
       parent_id: parentId,
       position: position0 + i,
     }))
@@ -661,7 +662,7 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   }
 
   function handleHeaderPasteCreate(names: string[]) {
-    handlePasteCreate(names, null, levels.filter(l => l.enabled)[0]?.id ?? null)
+    handlePasteCreate(names, null)
   }
 
   // Stable callback so UnitRow doesn't re-trigger effect
@@ -683,7 +684,6 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   }
 
   function handleAssign(personId: string, unitId: string) {
-    // Optimistic update
     setAllUsers(prev => prev.map(u => {
       if (u.id !== personId) return u
       const alreadyMember = u.memberships.some(m => m.unit_id === unitId)
@@ -704,7 +704,6 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
     }))
     doUpsertMembership(personId, unitId, 'member', false).catch(err => {
       console.error('Failed to assign membership', err)
-      // Revert on error
       setAllUsers(prev => prev.map(u => {
         if (u.id !== personId) return u
         return { ...u, memberships: u.memberships.filter(m => !(m.unit_id === unitId && m.id === 'tmp')) }
@@ -713,14 +712,12 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
   }
 
   function handleUnassign(personId: string, unitId: string) {
-    // Optimistic update
     setAllUsers(prev => prev.map(u => {
       if (u.id !== personId) return u
       return { ...u, memberships: u.memberships.filter(m => m.unit_id !== unitId) }
     }))
     doRemoveMembership(personId, unitId).catch(err => {
       console.error('Failed to remove membership', err)
-      // Revert: refetch to get correct state
       listUsers().then(setAllUsers).catch(err => console.error('UnitsTree: listUsers refetch failed', err))
     })
   }
@@ -731,30 +728,25 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
     navigate('/users')
   }
 
-  // Find the last unit in each parentId group to position the paste popover
-  // We render PastePopover as a separate row after the last sibling in the group
-  const rowsWithPaste: Array<UnitNodeData | { type: 'paste'; parentId: string | null; levelId: string | null }> = []
+  // Inject paste popover row after the last sibling in the paste target group
+  const rowsWithPaste: Array<UnitNodeData | { type: 'paste'; parentId: string | null }> = []
   if (pasteTarget) {
-    // We'll inject a paste row after the last unit matching the pasteTarget.parentId
     let lastMatchIdx = -1
     flat.forEach((node, idx) => {
-      if (!levelFilter || node.level_id === levelFilter) {
-        if (node.parent_id === pasteTarget.parentId) lastMatchIdx = idx
-      }
+      if (node.parent_id === pasteTarget.parentId) lastMatchIdx = idx
     })
     flat.forEach((node, idx) => {
       rowsWithPaste.push(node)
       if (idx === lastMatchIdx) {
-        rowsWithPaste.push({ type: 'paste', parentId: pasteTarget.parentId, levelId: pasteTarget.levelId })
+        rowsWithPaste.push({ type: 'paste', parentId: pasteTarget.parentId })
       }
     })
-    // If no matching unit found (new parent), append at end
     if (lastMatchIdx === -1) {
-      rowsWithPaste.push({ type: 'paste', parentId: pasteTarget.parentId, levelId: pasteTarget.levelId })
+      rowsWithPaste.push({ type: 'paste', parentId: pasteTarget.parentId })
     }
   }
 
-  const renderRows = pasteTarget ? rowsWithPaste : (flat as Array<UnitNodeData | { type: 'paste'; parentId: string | null; levelId: string | null }>)
+  const renderRows = pasteTarget ? rowsWithPaste : (flat as Array<UnitNodeData | { type: 'paste'; parentId: string | null }>)
 
   return (
     <div className="cd-set-section">
@@ -773,7 +765,9 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
             type="button"
             onClick={addLevelAbove}
             disabled={!canAddLevelAbove}
-            title={addLevelAboveTitle}
+            title={canAddLevelAbove
+              ? 'Insert a new unit above all current top-level units'
+              : 'Add units first'}
           >
             ↑ Level above
           </button>
@@ -791,46 +785,19 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
         />
       )}
 
-      {/* Level filter */}
-      {levels.length > 1 && (
-        <div className="cd-unit-level-filter">
-          <button
-            type="button"
-            className={'cd-okr-level-filter' + (!levelFilter ? ' is-on' : '')}
-            onClick={() => setLevelFilter(null)}
-          >All</button>
-          {levels.filter(l => l.enabled).map(l => (
-            <button
-              key={l.id}
-              type="button"
-              className={'cd-okr-level-filter' + (levelFilter === l.id ? ' is-on' : '')}
-              style={{ '--lf-color': l.color } as React.CSSProperties}
-              onClick={() => setLevelFilter(levelFilter === l.id ? null : l.id)}
-            >
-              {l.name}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="cd-units-list">
         {units.length === 0 ? (
-          <>
-            <OrgTemplates
-              levels={levels}
-              onApply={newUnits => {
-                onChange(newUnits)
-              }}
-              onBlank={addRoot}
-            />
-          </>
+          <OrgTemplates
+            onApply={newUnits => onChange(newUnits)}
+            onBlank={addRoot}
+          />
         ) : (
           renderRows.map((item, idx) => {
             if ('type' in item && item.type === 'paste') {
               return (
                 <div key={`paste-${idx}`} style={{ marginLeft: 12 }}>
                   <PastePopover
-                    onCreate={names => handlePasteCreate(names, item.parentId, item.levelId)}
+                    onCreate={names => handlePasteCreate(names, item.parentId)}
                     onClose={() => setPasteTarget(null)}
                   />
                 </div>
@@ -841,15 +808,12 @@ export function UnitsTree({ units, levels, onChange }: UnitsTreeProps) {
               <Fragment key={node.id}>
                 <UnitRow
                   unit={node}
-                  levels={levels}
-                  levelFilter={levelFilter}
                   initEditing={pendingFocusId === node.id}
                   onFocusConsumed={handleFocusConsumed}
                   onAddChild={addChild}
                   onAddSibling={addSibling}
                   onDelete={deleteUnit}
                   onRename={renameUnit}
-                  onChangeLevel={changeLevel}
                   onPasteForUnit={handlePasteForUnit}
                   allUsers={allUsers}
                   loadingUsers={loadingUsers}
