@@ -393,12 +393,7 @@ function UnitRow({
   )
 }
 
-// ── Starter templates ─────────────────────────────────────────────────────
-
-interface OrgTemplatesProps {
-  onApply: (units: Unit[]) => void
-  onBlank: () => void
-}
+// ── treeToUnits helper ────────────────────────────────────────────────────
 
 /** Convert a recursive AI tree into a flat Unit[] using temp ids. */
 function treeToUnits(nodes: OrgTreeNode[], parentId: string | null = null, counter = { n: 0 }): Unit[] {
@@ -413,11 +408,81 @@ function treeToUnits(nodes: OrgTreeNode[], parentId: string | null = null, count
   return result
 }
 
+// ── AIGeneratorPanel ──────────────────────────────────────────────────────
+
+interface AIGeneratorPanelProps {
+  onGenerate: (units: Unit[]) => void
+  onCancel?: () => void
+}
+
+function AIGeneratorPanel({ onGenerate, onCancel }: AIGeneratorPanelProps) {
+  const [description, setDescription] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleGenerate() {
+    if (!description.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const nodes = await suggestOrgStructure(description)
+      const units = treeToUnits(nodes)
+      if (units.length === 0) {
+        setError('The AI returned an empty structure. Try a more detailed description.')
+        return
+      }
+      onGenerate(units)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AI suggestion failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 8px' }}>
+        Describe your company's structure in plain language. The AI will build a draft you can edit before saving.
+      </p>
+      <textarea
+        className="cd-paste-textarea"
+        rows={4}
+        placeholder="e.g. We're a 40-person marketing agency with Creative, Client Services, and Operations departments. Creative has Design and Copywriting teams."
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        disabled={loading}
+      />
+      {error && (
+        <p style={{ fontSize: 13, color: 'var(--bad)', margin: '6px 0 0' }}>{error}</p>
+      )}
+      <div className="cd-paste-actions" style={{ marginTop: 8 }}>
+        <button
+          type="button"
+          className="cd-btn cd-btn-primary cd-btn-tiny"
+          onClick={handleGenerate}
+          disabled={!description.trim() || loading}
+        >
+          {loading ? 'Generating…' : 'Generate structure'}
+        </button>
+        {onCancel && (
+          <button type="button" className="cd-btn cd-btn-tiny" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Starter templates ─────────────────────────────────────────────────────
+
+interface OrgTemplatesProps {
+  onApply: (units: Unit[]) => void
+  onBlank: () => void
+}
+
 function OrgTemplates({ onApply, onBlank }: OrgTemplatesProps) {
   const [mode, setMode] = useState<'choice' | 'templates' | 'ai'>('choice')
-  const [aiDescription, setAiDescription] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
 
   /** Build a simple two-level structure: one root named "Company" with leaves as children. */
   function makeHierarchy(leafNames: string[]): Unit[] {
@@ -427,25 +492,6 @@ function OrgTemplates({ onApply, onBlank }: OrgTemplatesProps) {
       id: uid(), name, level_id: null, parent_id: rootId, position: i,
     }))
     return [root, ...leaves]
-  }
-
-  async function handleGenerate() {
-    if (!aiDescription.trim()) return
-    setAiLoading(true)
-    setAiError(null)
-    try {
-      const nodes = await suggestOrgStructure(aiDescription)
-      const units = treeToUnits(nodes)
-      if (units.length === 0) {
-        setAiError('The AI returned an empty structure. Try a more detailed description.')
-        return
-      }
-      onApply(units)
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'AI suggestion failed')
-    } finally {
-      setAiLoading(false)
-    }
   }
 
   if (mode === 'choice') {
@@ -459,7 +505,7 @@ function OrgTemplates({ onApply, onBlank }: OrgTemplatesProps) {
         <button
           type="button"
           className="cd-org-method-card"
-          onClick={() => { setAiError(null); setAiDescription(''); setMode('ai') }}
+          onClick={() => setMode('ai')}
         >
           <span className="cd-org-method-icon">✦</span>
           <span className="cd-org-method-title">Describe your company</span>
@@ -480,30 +526,7 @@ function OrgTemplates({ onApply, onBlank }: OrgTemplatesProps) {
         <button type="button" className="cd-org-template-back" onClick={() => setMode('choice')}>
           ← Back
         </button>
-        <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 8px' }}>
-          Describe your company's structure in plain language. The AI will build a draft you can edit before saving.
-        </p>
-        <textarea
-          className="cd-paste-textarea"
-          rows={4}
-          placeholder="e.g. We're a 40-person marketing agency with Creative, Client Services, and Operations departments. Creative has Design and Copywriting teams."
-          value={aiDescription}
-          onChange={e => setAiDescription(e.target.value)}
-          disabled={aiLoading}
-        />
-        {aiError && (
-          <p style={{ fontSize: 13, color: 'var(--bad)', margin: '6px 0 0' }}>{aiError}</p>
-        )}
-        <div className="cd-paste-actions" style={{ marginTop: 8 }}>
-          <button
-            type="button"
-            className="cd-btn cd-btn-primary cd-btn-tiny"
-            onClick={handleGenerate}
-            disabled={!aiDescription.trim() || aiLoading}
-          >
-            {aiLoading ? 'Generating…' : 'Generate structure'}
-          </button>
-        </div>
+        <AIGeneratorPanel onGenerate={units => onApply(units)} />
       </div>
     )
   }
@@ -548,6 +571,7 @@ export function UnitsTree({ units, onChange }: UnitsTreeProps) {
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null)
   const [pasteTarget, setPasteTarget] = useState<{ parentId: string | null } | null>(null)
   const [showHeaderPaste, setShowHeaderPaste] = useState(false)
+  const [showAiPanel, setShowAiPanel] = useState(false)
 
   // User data for picker (lazy loaded)
   const [allUsers, setAllUsers] = useState<ManagedUser[]>([])
@@ -756,7 +780,14 @@ export function UnitsTree({ units, onChange }: UnitsTreeProps) {
           <button
             className="cd-btn cd-btn-secondary cd-btn-tiny"
             type="button"
-            onClick={() => { setShowHeaderPaste(h => !h); setPasteTarget(null) }}
+            onClick={() => { setShowAiPanel(v => !v); setShowHeaderPaste(false); setPasteTarget(null) }}
+          >
+            ✦ Generate with AI
+          </button>
+          <button
+            className="cd-btn cd-btn-secondary cd-btn-tiny"
+            type="button"
+            onClick={() => { setShowHeaderPaste(h => !h); setShowAiPanel(false); setPasteTarget(null) }}
           >
             ⊞ Paste list
           </button>
@@ -776,6 +807,17 @@ export function UnitsTree({ units, onChange }: UnitsTreeProps) {
           </button>
         </div>
       </div>
+
+      {/* AI generator panel — always available, additive when units already exist */}
+      {showAiPanel && (
+        <AIGeneratorPanel
+          onGenerate={newUnits => {
+            onChange([...units, ...newUnits])
+            setShowAiPanel(false)
+          }}
+          onCancel={() => setShowAiPanel(false)}
+        />
+      )}
 
       {/* Header paste popover */}
       {showHeaderPaste && (
