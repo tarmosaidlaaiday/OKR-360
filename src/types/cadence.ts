@@ -316,6 +316,39 @@ export interface KrTask {
   created_at: string
 }
 
+// ── Personal tasks (non-KR, 1:1-originated or standalone) ───────────────
+
+export interface PersonalTask {
+  id: string
+  org_id: string
+  title: string
+  status: KrTaskStatus
+  assignee_id: string | null
+  assignee?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
+  created_by: string
+  due_date: string | null
+  one_on_one_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Unified task aggregating kr_tasks + personal_tasks for the Tasks page
+export interface UnifiedTask {
+  id: string
+  source: 'kr' | 'personal'
+  title: string
+  status: KrTaskStatus
+  due_date: string | null
+  assignee_id: string | null
+  assignee?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
+  // Human-readable source context
+  source_label: string  // e.g. "Prep task · KR title" | "1:1 with Jane, 15 Jan" | "Personal"
+  // Present on kr-source rows (needed for status updates)
+  key_result_id?: string
+  // Present on personal-source rows
+  one_on_one_id?: string | null
+}
+
 // ── Cascade visibility ───────────────────────────────────────────────────
 
 export interface VisibleUnit {
