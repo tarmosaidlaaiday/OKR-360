@@ -9,6 +9,8 @@ import { supabase } from '../../lib/supabase'
 import { keyResultsService } from '../../services/keyResults.service'
 import { suggestKRs } from '../../services/aiSuggestions.service'
 import { getGuardrailKpis, addGuardrailKpi, removeGuardrailKpi, getKpisForGuardrailPicker } from '../../services/guardrails.service'
+import { getRelevantUnits, addRelevantUnit, removeRelevantUnit } from '../../services/relevance.service'
+import type { RelevantUnit } from '../../services/relevance.service'
 import type { OKRTemplate } from '../../data/okrTemplates'
 import type { Objective, CreateObjectiveInput, ObjectiveStatus } from '../../types'
 import type { KrTargetType } from '../../types'
@@ -179,6 +181,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   const [kpiOpts, setKpiOpts]           = useState<{ id: string; name: string; unit: string; role_name: string }[]>([])
   const [addingGuardrail, setAddingGuardrail] = useState(false)
 
+  // Relevant units — edit: persisted immediately; create: staged until objective is saved
+  const [relevantUnits, setRelevantUnits] = useState<RelevantUnit[]>([])
+  const [stagedRelevantUnitIds, setStagedRelevantUnitIds] = useState<Set<string>>(new Set())
+  const [addingRelevantUnit, setAddingRelevantUnit] = useState(false)
+
   // Default cycleId once cycles are available (only when not already set)
   useEffect(() => {
     if (cycleId || isEdit) return
@@ -196,6 +203,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     })
     if (isEdit && objective?.id) {
       getGuardrailKpis(objective.id).then(setGuardrails).catch(console.error)
+      getRelevantUnits(objective.id).then(setRelevantUnits).catch(console.error)
     }
   }, [open, refresh, isEdit, objective?.id])
 
@@ -316,6 +324,13 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         )
       }
 
+      // Commit staged relevant units on create
+      if (!isEdit && typeof objectiveId === 'string' && stagedRelevantUnitIds.size > 0 && user?.id) {
+        await Promise.all(
+          [...stagedRelevantUnitIds].map(unitId => addRelevantUnit(objectiveId, unitId, user.id!))
+        )
+      }
+
       onClose()
       if (!isEdit) {
         setTitle(''); setDescription('')
@@ -323,6 +338,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         setUnitId(''); setParentId(''); setStatus('on_track')
         setKrs([]); setAiError('')
         setStagedGuardrailIds(new Set())
+        setStagedRelevantUnitIds(new Set())
       }
     } catch (ex) {
       setError(getErrorMessage(ex))
@@ -603,6 +619,99 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '4px 0 0' }}>
               KPIs whose deterioration will surface as a warning on this objective.
+            </p>
+          </div>
+        )}
+
+        {/* Relevant units — drives the Waterfall view */}
+        {units.length > 0 && (
+          <div className="cd-field">
+            <span className="cd-field-lbl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Icon name="sitemap" size={13} />
+              Relevant to <span style={{ color: 'var(--ink-faint)', fontWeight: 400 }}>(optional)</span>
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              {isEdit
+                ? relevantUnits.map(ru => (
+                    <span key={ru.id} className="cd-guardrail-tag">
+                      {ru.unit.name}
+                      <button
+                        type="button"
+                        className="cd-btn-icon"
+                        style={{ marginLeft: 2, fontSize: 11 }}
+                        onClick={async () => {
+                          await removeRelevantUnit(ru.id)
+                          setRelevantUnits(prev => prev.filter(x => x.id !== ru.id))
+                        }}
+                        title="Remove unit"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))
+                : [...stagedRelevantUnitIds].map(unitId => {
+                    const u = units.find(u => u.id === unitId)
+                    return (
+                      <span key={unitId} className="cd-guardrail-tag">
+                        {u?.name ?? unitId}
+                        <button
+                          type="button"
+                          className="cd-btn-icon"
+                          style={{ marginLeft: 2, fontSize: 11 }}
+                          onClick={() => setStagedRelevantUnitIds(prev => { const s = new Set(prev); s.delete(unitId); return s })}
+                          title="Remove unit"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    )
+                  })
+              }
+              {addingRelevantUnit ? (
+                <select
+                  className="cd-um-select"
+                  style={{ fontSize: 12 }}
+                  autoFocus
+                  defaultValue=""
+                  onChange={async e => {
+                    const unitId = e.target.value
+                    if (!unitId) return
+                    setAddingRelevantUnit(false)
+                    if (isEdit && objective?.id && user?.id) {
+                      await addRelevantUnit(objective.id, unitId, user.id)
+                      const updated = await getRelevantUnits(objective.id)
+                      setRelevantUnits(updated)
+                    } else {
+                      setStagedRelevantUnitIds(prev => new Set(prev).add(unitId))
+                    }
+                  }}
+                  onBlur={() => setAddingRelevantUnit(false)}
+                >
+                  <option value="">Select a unit…</option>
+                  {units
+                    .filter(u =>
+                      isEdit
+                        ? !relevantUnits.some(ru => ru.unit_id === u.id)
+                        : !stagedRelevantUnitIds.has(u.id)
+                    )
+                    .map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))
+                  }
+                </select>
+              ) : (
+                <button
+                  type="button"
+                  className="cd-btn"
+                  style={{ fontSize: 12, padding: '2px 8px' }}
+                  onClick={() => setAddingRelevantUnit(true)}
+                >
+                  <Icon name="plus" size={11} /> Add unit
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '4px 0 0' }}>
+              Units expected to align a child objective to this one — shown in the Waterfall view.
             </p>
           </div>
         )}
