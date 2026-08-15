@@ -1,13 +1,11 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCycle } from '../context/CycleContext'
 import { useOrg } from '../context/OrgContext'
 import { useCadenceObjectives } from '../hooks/useCadenceObjectives'
-import { objectivesService, getChildObjectives } from '../services/objectives.service'
+import { objectivesService } from '../services/objectives.service'
 import { keyResultsService } from '../services/keyResults.service'
-import { getRelevantUnits } from '../services/relevance.service'
-import type { RelevantUnit } from '../services/relevance.service'
 import { ObjectiveForm } from '../components/objectives/ObjectiveForm'
 import { usePageActionStore } from '../stores/pageActionStore'
 import { MyFocusPage } from './MyFocusPage'
@@ -23,8 +21,7 @@ import { Avatar } from '../components/cadence/Avatar'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Segmented } from '../components/cadence/Segmented'
 import { Icon } from '../components/cadence/Icon'
-import { getQuarterWeeks, getCurrentWeekIdx, fmt, objectiveProgress } from '../lib/cadenceUtils'
-import { getErrorMessage } from '../lib/errors'
+import { getQuarterWeeks, getCurrentWeekIdx, fmt } from '../lib/cadenceUtils'
 import type { CreateObjectiveInput } from '../types'
 import type { CadenceObjective } from '../types/cadence'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -293,194 +290,6 @@ function AllOKRsTab() {
   )
 }
 
-// ── Waterfall tab ─────────────────────────────────────────────────────────
-// Shows a selected objective at the root, then for every unit tagged as
-// relevant (via objective_relevant_units) shows either the child objective
-// that unit has aligned to this one, or a "Not yet aligned" gap indicator.
-// Recurses up to MAX_WATERFALL_DEPTH levels deep (matching useCascadeChain).
-
-const MAX_WATERFALL_DEPTH = 6
-
-interface WaterfallSectionProps {
-  objectiveId: string
-  depth: number
-}
-
-function WaterfallSection({ objectiveId, depth }: WaterfallSectionProps) {
-  const [loading, setLoading] = useState(true)
-  const [relevantUnits, setRelevantUnits] = useState<RelevantUnit[]>([])
-  const [children, setChildren] = useState<CadenceObjective[]>([])
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    setLoading(true)
-    setError(null)
-    Promise.all([
-      getRelevantUnits(objectiveId),
-      getChildObjectives(objectiveId),
-    ])
-      .then(([units, childObjs]) => {
-        setRelevantUnits(units)
-        setChildren(childObjs as CadenceObjective[])
-      })
-      .catch(err => setError(getErrorMessage(err)))
-      .finally(() => setLoading(false))
-  }, [objectiveId])
-
-  if (loading) {
-    return <div className="cd-wf-loading">Loading…</div>
-  }
-  if (error) {
-    return <div className="cd-wf-error">{error}</div>
-  }
-  if (relevantUnits.length === 0) {
-    if (depth === 0) {
-      return (
-        <div className="cd-wf-no-units">
-          <Icon name="sitemap" size={20} />
-          <p>No units marked as relevant to this objective.</p>
-          <p style={{ fontSize: 12, color: 'var(--ink-faint)' }}>
-            Edit the objective and use "Relevant to" to tag which units are expected to align.
-          </p>
-        </div>
-      )
-    }
-    return null
-  }
-
-  return (
-    <div className="cd-wf-section">
-      {relevantUnits.map(ru => {
-        const aligned = children.find(c => c.unit_id === ru.unit_id) ?? null
-        const progress = aligned ? objectiveProgress(aligned.key_results ?? []) : 0
-
-        return (
-          <div key={ru.id} className="cd-wf-unit-block">
-            <div className="cd-wf-unit-label">
-              <span className="cd-wf-unit-dot" />
-              <span className="cd-wf-unit-name">{ru.unit.name}</span>
-            </div>
-
-            {aligned ? (
-              <div className="cd-wf-aligned">
-                <div className="cd-wf-obj-header">
-                  <StatusChip status={aligned.status as any} size="sm" />
-                  <span className="cd-wf-obj-title">{aligned.title}</span>
-                </div>
-                <div className="cd-wf-progress-row">
-                  <ProgressBar value={progress} height={4} />
-                  <span className="cd-wf-pct">{Math.round(progress * 100)}%</span>
-                </div>
-                {depth < MAX_WATERFALL_DEPTH - 1 && (
-                  <WaterfallSection objectiveId={aligned.id} depth={depth + 1} />
-                )}
-              </div>
-            ) : (
-              <div className="cd-wf-gap">
-                <span className="cd-wf-gap-badge">
-                  <Icon name="alertTriangle" size={11} />
-                  Not yet aligned
-                </span>
-                <span className="cd-wf-gap-hint">
-                  No objective from {ru.unit.name} is aligned to this one yet
-                </span>
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function WaterfallTab() {
-  const { activeCycle } = useCycle()
-  const quarter = activeCycle?.quarter ?? 1
-  const year = activeCycle?.year ?? new Date().getFullYear()
-  const { objectives, loading } = useCadenceObjectives(activeCycle?.id ?? null, quarter, year)
-
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-
-  const topLevel = objectives.filter(o => !o.parent_objective_id)
-  const other    = objectives.filter(o => !!o.parent_objective_id)
-
-  // Default to first top-level objective once loaded
-  useEffect(() => {
-    if (!selectedId && topLevel.length > 0) {
-      setSelectedId(topLevel[0].id)
-    }
-  }, [topLevel.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const selectedObj = objectives.find(o => o.id === selectedId) ?? null
-
-  if (loading) return <div className="cd-page"><p className="cd-loading">Loading objectives…</p></div>
-
-  return (
-    <div className="cd-page">
-      <PageHeader
-        title="Waterfall"
-        sub={activeCycle?.label}
-      />
-
-      {objectives.length === 0 ? (
-        <EmptyState icon="target"
-          title={`No objectives for ${activeCycle?.label ?? 'this cycle'} yet`}
-          description="Create objectives first, then mark which units are relevant to see the waterfall."
-        />
-      ) : (
-        <>
-          {/* Objective picker */}
-          <div className="cd-wf-picker">
-            <label className="cd-wf-picker-label">Waterfall from</label>
-            <select
-              className="cd-um-select"
-              style={{ maxWidth: 420 }}
-              value={selectedId ?? ''}
-              onChange={e => setSelectedId(e.target.value)}
-            >
-              <option value="">Choose an objective…</option>
-              {topLevel.length > 0 && (
-                <optgroup label="Top-level objectives">
-                  {topLevel.map(o => (
-                    <option key={o.id} value={o.id}>{o.title}</option>
-                  ))}
-                </optgroup>
-              )}
-              {other.length > 0 && (
-                <optgroup label="Child objectives">
-                  {other.map(o => (
-                    <option key={o.id} value={o.id}>{o.title}</option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-
-          {selectedObj && (
-            <div className="cd-wf-root">
-              {/* Root objective */}
-              <div className="cd-wf-root-card">
-                <div className="cd-wf-root-eyebrow">
-                  {selectedObj.level?.name ?? 'Objective'}
-                </div>
-                <div className="cd-wf-root-title">{selectedObj.title}</div>
-                <div className="cd-wf-root-meta">
-                  <Avatar person={selectedObj.owner ?? null} size={18} />
-                  <span>{selectedObj.owner?.name ?? '—'}</span>
-                  <StatusChip status={selectedObj.status as any} size="sm" />
-                </div>
-              </div>
-
-              {/* Recursive waterfall */}
-              <WaterfallSection objectiveId={selectedObj.id} depth={0} />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -488,7 +297,6 @@ const TABS = [
   { id: 'all-okrs',  label: 'All OKRs'  },
   { id: 'cascade',   label: 'Cascade'   },
   { id: 'alignment', label: 'Alignment' },
-  { id: 'waterfall', label: 'Waterfall' },
 ]
 
 export function ObjectivesPage() {
@@ -526,7 +334,6 @@ export function ObjectivesPage() {
         {tab === 'all-okrs'  && <AllOKRsTab key={refreshKey} />}
         {tab === 'cascade'   && <CascadePage />}
         {tab === 'alignment' && <MyContributionPage />}
-        {tab === 'waterfall' && <WaterfallTab />}
       </div>
 
       <ObjectiveForm

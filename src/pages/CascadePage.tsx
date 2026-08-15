@@ -8,6 +8,8 @@ import { ConfidenceCell } from '../components/cadence/ConfidenceCell'
 import { Sparkline } from '../components/cadence/Sparkline'
 import { Icon } from '../components/cadence/Icon'
 import { profileToPerson } from '../lib/cadenceUtils'
+import { getRelevantUnitsForObjectives } from '../services/relevance.service'
+import type { RelevantUnit } from '../services/relevance.service'
 import type { CadenceObjective } from '../types/cadence'
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -105,6 +107,7 @@ function CascadeNodeCard({
   isHighlighted,
   isDimmed,
   isGap,
+  relevanceGapCount,
   onClick,
 }: {
   obj: CadenceObjective
@@ -112,6 +115,7 @@ function CascadeNodeCard({
   isHighlighted: boolean
   isDimmed: boolean
   isGap: boolean
+  relevanceGapCount: number
   onClick: () => void
 }) {
   const lastConf = [...obj.confidence].reverse().find(v => v != null) ?? null
@@ -157,12 +161,23 @@ function CascadeNodeCard({
           <ProgressBar value={obj.progress} height={3} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
             <Avatar person={owner} size={16} />
-            {lastConf != null && <ConfidenceCell value={lastConf} size={18} />}
-            {isGap && (
-              <span title="No parent link" style={{ color: 'var(--bad)', fontSize: 10 }}>
-                <Icon name="alertTriangle" size={11} />
-              </span>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {lastConf != null && <ConfidenceCell value={lastConf} size={18} />}
+              {relevanceGapCount > 0 && (
+                <span
+                  title={`${relevanceGapCount} unit${relevanceGapCount !== 1 ? 's' : ''} not yet aligned — click for details`}
+                  style={{ color: 'var(--warn)', fontSize: 10, display: 'flex', alignItems: 'center', gap: 2 }}
+                >
+                  <Icon name="alertTriangle" size={10} />
+                  {relevanceGapCount}
+                </span>
+              )}
+              {isGap && (
+                <span title="No parent link" style={{ color: 'var(--bad)', fontSize: 10 }}>
+                  <Icon name="alertTriangle" size={11} />
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -273,10 +288,14 @@ function ListRow({
 function DetailPanel({
   obj,
   byId,
+  childrenMap,
+  relevantUnits,
   onClose,
 }: {
   obj: CadenceObjective
   byId: Map<string, CadenceObjective>
+  childrenMap: Map<string, string[]>
+  relevantUnits: RelevantUnit[]
   onClose: () => void
 }) {
   // Build breadcrumb chain
@@ -290,6 +309,10 @@ function DetailPanel({
   const confValues = obj.confidence.filter((v): v is number => v != null)
   const lastConf = confValues.at(-1) ?? null
   const owner = obj.owner ? profileToPerson(obj.owner as any) : null
+
+  // Gap detection: which relevant units have no aligned child?
+  const childIds = childrenMap.get(obj.id) ?? []
+  const childObjs = childIds.map(id => byId.get(id)).filter((c): c is CadenceObjective => !!c)
 
   return (
     <div className="cd-csc-panel">
@@ -370,6 +393,49 @@ function DetailPanel({
             ))}
           </div>
         )}
+
+        {/* Relevant units / alignment gaps */}
+        {relevantUnits.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--ink-soft)', marginBottom: 6 }}>
+              Relevant units
+            </div>
+            <div className="cd-wf-section" style={{ gap: 8 }}>
+              {relevantUnits.map(ru => {
+                const aligned = childObjs.find(c => c.unit_id === ru.unit_id) ?? null
+                return (
+                  <div key={ru.id} className="cd-wf-unit-block" style={{ padding: '6px 0' }}>
+                    <div className="cd-wf-unit-label">
+                      <span className="cd-wf-unit-dot" />
+                      <span className="cd-wf-unit-name">{ru.unit.name}</span>
+                    </div>
+                    {aligned ? (
+                      <div className="cd-wf-aligned" style={{ marginTop: 4 }}>
+                        <div className="cd-wf-obj-header">
+                          <span className="cd-wf-obj-title">{aligned.title}</span>
+                        </div>
+                        <div className="cd-wf-progress-row">
+                          <ProgressBar value={aligned.progress} height={3} />
+                          <span className="cd-wf-pct">{Math.round(aligned.progress * 100)}%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="cd-wf-gap" style={{ marginTop: 4 }}>
+                        <span className="cd-wf-gap-badge">
+                          <Icon name="alertTriangle" size={11} />
+                          Not yet aligned
+                        </span>
+                        <span className="cd-wf-gap-hint">
+                          No objective from {ru.unit.name} is aligned to this one yet
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -391,6 +457,7 @@ export function CascadePage() {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [view, setView] = useState<ViewMode>('tree')
   const [selected, setSelected] = useState<string | null>(null)
+  const [relevantUnitsMap, setRelevantUnitsMap] = useState<Map<string, RelevantUnit[]>>(new Map())
 
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -489,6 +556,14 @@ export function CascadePage() {
   function handleSelect(id: string) {
     setSelected(prev => prev === id ? null : id)
   }
+
+  // Batch-load relevant units for all objectives once they are available
+  useEffect(() => {
+    if (objectives.length === 0) { setRelevantUnitsMap(new Map()); return }
+    getRelevantUnitsForObjectives(objectives.map(o => o.id))
+      .then(setRelevantUnitsMap)
+      .catch(() => { /* best-effort — gaps simply won't show if this fails */ })
+  }, [objectives])
 
   // Click outside canvas to deselect
   useEffect(() => {
@@ -614,6 +689,10 @@ export function CascadePage() {
                 const isSelected = selected === obj.id
                 const isHighlighted = !selected || !!(highlightSet?.has(obj.id))
                 const isDimmed = !!selected && !isHighlighted
+                const ruList = relevantUnitsMap.get(obj.id) ?? []
+                const childIds = childrenMap.get(obj.id) ?? []
+                const childObjs = childIds.map(id => byId.get(id)).filter((c): c is CadenceObjective => !!c)
+                const relevanceGapCount = ruList.filter(ru => !childObjs.some(c => c.unit_id === ru.unit_id)).length
                 return (
                   <div
                     key={obj.id}
@@ -625,6 +704,7 @@ export function CascadePage() {
                       isHighlighted={isHighlighted}
                       isDimmed={isDimmed}
                       isGap={isGapFn(obj)}
+                      relevanceGapCount={relevanceGapCount}
                       onClick={() => handleSelect(obj.id)}
                     />
                   </div>
@@ -639,6 +719,8 @@ export function CascadePage() {
           <DetailPanel
             obj={byId.get(selected)!}
             byId={byId}
+            childrenMap={childrenMap}
+            relevantUnits={relevantUnitsMap.get(selected) ?? []}
             onClose={() => setSelected(null)}
           />
         )}

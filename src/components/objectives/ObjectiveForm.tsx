@@ -711,7 +711,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
               )}
             </div>
             <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '4px 0 0' }}>
-              Units expected to align a child objective to this one — shown in the Waterfall view.
+              Units expected to align a child objective to this one — gaps surface in the Cascade view.
             </p>
           </div>
         )}
