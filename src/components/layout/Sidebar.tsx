@@ -11,6 +11,7 @@ const MAIN_NAV = [
   { to: '/dashboard',          icon: 'dashboard'   as const, label: 'Dashboard'  },
   { to: '/objectives',         icon: 'checkCircle' as const, label: 'Objectives' },
   { to: '/kpis',               icon: 'chart'       as const, label: 'KPIs'       },
+  { to: '/tasks',              icon: 'task'        as const, label: 'Tasks'      },
   { to: '/people',             icon: 'users'       as const, label: 'People'     },
   { to: '/history',            icon: 'history'     as const, label: 'History'    },
   { to: '/analytics',          icon: 'chartLine'   as const, label: 'Analytics'  },

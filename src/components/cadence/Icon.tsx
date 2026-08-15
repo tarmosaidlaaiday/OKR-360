@@ -6,6 +6,7 @@ type IconName =
   | 'link' | 'x' | 'star' | 'users' | 'bell' | 'alertTriangle'
   | 'mail' | 'shield' | 'slash' | 'eye' | 'eyeOff' | 'checkCircle' | 'chartLine' | 'sitemap'
   | 'history' | 'zap' | 'hourglass' | 'thumbsUp' | 'moreVertical' | 'pencil' | 'trash'
+  | 'task'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard:  <><rect x="3" y="3"  width="7" height="9"  rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/></>,
@@ -51,6 +52,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   moreVertical:  <><circle cx="12" cy="5"  r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="19" r="1.3" fill="currentColor" stroke="none"/></>,
   pencil:        <><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></>,
   trash:         <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></>,
+  task:          <><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M9 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-3"/><path d="M9 12l2 2 4-4"/></>,
 }
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {

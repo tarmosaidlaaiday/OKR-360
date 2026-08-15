@@ -5019,3 +5019,23 @@ kbd.cd-kbd {
   color: var(--bad);
   padding: 6px 0;
 }
+
+/* ── Unified Tasks page ───────────────────────────────────────────────────── */
+.cd-ut-filters {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 4px;
+  align-items: center;
+}
+.cd-ut-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px;
+}
+.cd-ut-row:hover { background: var(--bg-sub); }
+.cd-ut-source {
+  font-size: 11px; color: var(--ink-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 240px;
+}
+.cd-ut-due { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.cd-ut-add {
+  display: flex; align-items: center; gap: 8px;
+}
