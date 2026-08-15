@@ -4847,3 +4847,175 @@ kbd.cd-kbd {
   border: 1px solid var(--line);
 }
 .cd-delete-confirm-no:hover { background: var(--line); }
+
+/* ── Waterfall view ──────────────────────────────────────────────────────── */
+
+.cd-wf-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.cd-wf-picker-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+.cd-wf-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cd-wf-root-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: 4px;
+}
+.cd-wf-root-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.cd-wf-root-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.cd-wf-root-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* Section: recursive container for one level of relevant units */
+.cd-wf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 20px;
+  border-left: 2px solid var(--line);
+  margin-left: 16px;
+  margin-top: 6px;
+}
+
+.cd-wf-unit-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--bg-sub);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.cd-wf-unit-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+.cd-wf-unit-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.cd-wf-unit-name { color: var(--ink-mid); }
+
+/* Aligned state */
+.cd-wf-aligned {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cd-wf-obj-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cd-wf-obj-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.cd-wf-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cd-wf-progress-row > * { flex: 1; }
+.cd-wf-pct {
+  flex: 0 0 auto !important;
+  font-size: 11px;
+  font-family: "Geist Mono", monospace;
+  color: var(--ink-soft);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Gap state */
+.cd-wf-gap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cd-wf-gap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--warn) 12%, transparent);
+  color: var(--warn);
+  border: 1px solid color-mix(in oklab, var(--warn) 30%, transparent);
+}
+.cd-wf-gap-hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+/* Empty / loading states */
+.cd-wf-no-units {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--ink-faint);
+  font-size: 13px;
+  text-align: center;
+}
+.cd-wf-no-units p { margin: 0; }
+.cd-wf-loading {
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding: 8px 0;
+}
+.cd-wf-error {
+  font-size: 12px;
+  color: var(--bad);
+  padding: 6px 0;
+}
