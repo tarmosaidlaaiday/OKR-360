@@ -15,8 +15,10 @@ import { getErrorMessage } from '../lib/errors'
 import {
   createDraftSession, duplicateSession, deleteSession, updateSchedule,
 } from '../services/oneOnOnes.service'
+import { getMyAllTasks, createPersonalTask, updatePersonalTaskStatus } from '../services/personalTasks.service'
+import { updateKrTaskStatus } from '../services/krTasks.service'
 import { EmptyState } from '../components/cadence/EmptyState'
-import type { OneOnOneEntry, Person, CadenceObjective } from '../types/cadence'
+import type { OneOnOneEntry, Person, CadenceObjective, UnifiedTask, KrTaskStatus } from '../types/cadence'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -329,13 +331,191 @@ function FeedbackAgenda({ person, entry, onChange }: {
   )
 }
 
+// ── Task check button (reused from MyFocusPage pattern) ───────────────────
+
+function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`cd-kr-task-check cd-kr-task-check--${status}`}
+      onClick={onClick}
+      title={status === 'todo' ? 'Mark in progress' : status === 'in_progress' ? 'Mark done' : 'Reset to todo'}
+    >
+      {status === 'in_progress' && <Icon name="circle" size={8} />}
+      {status === 'done' && <Icon name="check" size={10} />}
+    </button>
+  )
+}
+
+// ── Tasks tab ─────────────────────────────────────────────────────────────
+
+function TasksAgenda({
+  person, currentUserId, orgId, oneOnOneId,
+}: {
+  person: Person
+  currentUserId: string
+  orgId: string
+  oneOnOneId: string | null
+}) {
+  const [tasks, setTasks] = useState<UnifiedTask[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newTitle, setNewTitle] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!person.id) return
+    setLoading(true)
+    getMyAllTasks(person.id)
+      .then(setTasks)
+      .catch(e => setError(getErrorMessage(e)))
+      .finally(() => setLoading(false))
+  }, [person.id])
+
+  async function handleStatusChange(id: string, nextStatus: KrTaskStatus) {
+    const task = tasks.find(t => t.id === id)
+    if (!task) return
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t))
+    try {
+      if (task.source === 'kr') {
+        await updateKrTaskStatus(id, nextStatus)
+      } else {
+        await updatePersonalTaskStatus(id, nextStatus)
+      }
+    } catch (e) {
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, status: task.status } : t))
+      setError(getErrorMessage(e))
+    }
+  }
+
+  async function handleAddTask(e: React.FormEvent) {
+    e.preventDefault()
+    const title = newTitle.trim()
+    if (!title || !orgId || !oneOnOneId) return
+    setAdding(true)
+    try {
+      const created = await createPersonalTask({
+        org_id: orgId,
+        title,
+        assignee_id: person.id,
+        created_by: currentUserId,
+        one_on_one_id: oneOnOneId,
+      })
+      const newTask: UnifiedTask = {
+        id: created.id,
+        source: 'personal',
+        title: created.title,
+        status: created.status,
+        due_date: created.due_date,
+        assignee_id: created.assignee_id,
+        source_label: `1:1 with ${person.name.split(' ')[0]}`,
+        one_on_one_id: oneOnOneId,
+      }
+      setTasks(prev => [...prev, newTask])
+      setNewTitle('')
+    } catch (e) {
+      setError(getErrorMessage(e))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const firstName = person.name.split(' ')[0]
+  const openTasks = tasks.filter(t => t.status !== 'done')
+  const doneTasks = tasks.filter(t => t.status === 'done')
+
+  return (
+    <div className="cd-oo-body">
+      {error && <p style={{ color: 'var(--danger)', fontSize: 13, margin: '0 0 8px' }}>{error}</p>}
+      {loading && <p className="cd-loading">Loading tasks…</p>}
+
+      {!loading && (
+        <>
+          <div className="cd-oo-goal">
+            <Icon name="task" size={14} />
+            <span>
+              <strong>{firstName}'s open tasks.</strong>
+              {' '}Review progress, check off done items, and add new ones during the conversation.
+            </span>
+          </div>
+
+          <div className="cd-kr-task-list" style={{ marginTop: 12 }}>
+            {openTasks.length === 0 && (
+              <p className="cd-empty-hint" style={{ padding: '8px 0' }}>No open tasks for {firstName}.</p>
+            )}
+            {openTasks.map(task => (
+              <div key={task.id} className="cd-kr-task-row">
+                <TaskCheck
+                  status={task.status}
+                  onClick={() => {
+                    const next: KrTaskStatus = task.status === 'todo' ? 'in_progress'
+                      : task.status === 'in_progress' ? 'done' : 'todo'
+                    handleStatusChange(task.id, next)
+                  }}
+                />
+                <span className="cd-kr-task-title" style={{ flex: 1 }}>{task.title}</span>
+                <span style={{ fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
+                  {task.source_label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Inline add-task form */}
+          {oneOnOneId && (
+            <form onSubmit={handleAddTask} className="cd-kr-task-add" style={{ marginTop: 8 }}>
+              <span style={{ color: 'var(--ink-faint)', display: 'flex' }}><Icon name="plus" size={12} /></span>
+              <input
+                className="cd-kr-task-add-input"
+                placeholder={`Assign a task to ${firstName}…`}
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                disabled={adding}
+              />
+              <button
+                type="submit"
+                className="cd-btn cd-btn-primary cd-btn-tiny"
+                disabled={adding || !newTitle.trim()}
+              >
+                {adding ? '…' : 'Add'}
+              </button>
+            </form>
+          )}
+
+          {doneTasks.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 16, marginBottom: 4, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Done
+              </div>
+              <div className="cd-kr-task-list">
+                {doneTasks.map(task => (
+                  <div key={task.id} className="cd-kr-task-row cd-kr-task-done">
+                    <TaskCheck
+                      status={task.status}
+                      onClick={() => handleStatusChange(task.id, 'todo')}
+                    />
+                    <span className="cd-kr-task-title" style={{ flex: 1 }}>{task.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>
+                      {task.source_label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 
-type TabId = 'personal' | 'work' | 'okrs' | 'feedback'
+type TabId = 'personal' | 'work' | 'okrs' | 'feedback' | 'tasks'
 
 export function OneOnOnesPage() {
   const { activeCycle } = useCycle()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const navigate = useNavigate()
   const hook = useOneOnOnes()
   const {
@@ -695,6 +875,7 @@ export function OneOnOnesPage() {
                   { id: 'work',     label: 'Work' },
                   { id: 'okrs',     label: 'OKRs & KPIs' },
                   { id: 'feedback', label: 'Feedback' },
+                  { id: 'tasks',    label: 'Tasks' },
                 ] as { id: TabId; label: string }[]).map(t => (
                   <button
                     key={t.id}
@@ -731,6 +912,14 @@ export function OneOnOnesPage() {
                   person={selectedPerson}
                   entry={localEntry}
                   onChange={handleEntryChange}
+                />
+              )}
+              {tab === 'tasks' && (
+                <TasksAgenda
+                  person={selectedPerson}
+                  currentUserId={user?.id ?? ''}
+                  orgId={profile?.org_id ?? ''}
+                  oneOnOneId={openSessionId}
                 />
               )}
 

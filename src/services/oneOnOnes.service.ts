@@ -140,12 +140,14 @@ export async function createDraftSession(
   managerId: string,
   reportId: string,
 ): Promise<string> {
+  const scheduledAt = new Date().toISOString()
+
   const { data, error } = await supabase
     .from('one_on_ones')
     .insert({
       manager_id: managerId,
       report_id: reportId,
-      scheduled_at: new Date().toISOString(),
+      scheduled_at: scheduledAt,
       status: 'draft',
       done: false,
     })
@@ -155,6 +157,30 @@ export async function createDraftSession(
 
   // Create the entry row
   await supabase.from('one_on_one_entries').insert({ one_on_one_id: data.id })
+
+  // Create a "Submit 1:1 prep" task assigned to the report (best-effort)
+  try {
+    const { data: managerProfile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', managerId)
+      .single()
+
+    if (managerProfile?.org_id) {
+      const dueDate = scheduledAt.slice(0, 10) // YYYY-MM-DD
+      const dateLabel = new Date(scheduledAt).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'short',
+      })
+      await supabase.from('personal_tasks').insert({
+        org_id: managerProfile.org_id,
+        title: `Submit 1:1 prep for ${dateLabel}`,
+        assignee_id: reportId,
+        created_by: managerId,
+        due_date: dueDate,
+        one_on_one_id: data.id,
+      })
+    }
+  } catch { /* best-effort — don't block session creation */ }
 
   return data.id
 }
@@ -211,6 +237,16 @@ export async function submitSession(
       .update({ submitted_at: now, last_saved_at: now })
       .eq('id', (entry as any).id)
   }
+
+  // Mark the "Submit 1:1 prep" personal task done (best-effort)
+  try {
+    await supabase
+      .from('personal_tasks')
+      .update({ status: 'done' })
+      .eq('one_on_one_id', oneOnOneId)
+      .like('title', 'Submit 1:1 prep for%')
+      .neq('status', 'done')
+  } catch { /* best-effort */ }
 
   // Notify the other participant
   try {
