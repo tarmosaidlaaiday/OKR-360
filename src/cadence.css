@@ -404,7 +404,8 @@ kbd.cd-kbd {
   gap: 12px;
   padding: 14px var(--d-pad-card) 8px;
 }
-.cd-card-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cd-card-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.cd-card-hd > div:last-child { flex-shrink: 0; white-space: nowrap; }
 .cd-card-eyebrow {
   font-size: 10px;
   font-weight: 600;
@@ -524,10 +525,15 @@ kbd.cd-kbd {
   z-index: 2;
 }
 .cd-conf-empty {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 5px;
   background: color-mix(in oklab, var(--ink) 4%, transparent);
   border: 1px dashed var(--line);
+  color: var(--ink-faint);
+  font-size: 13px;
+  user-select: none;
 }
 
 /* ─── Confidence trend (compact) ───────────────────────────────────────── */
@@ -575,14 +581,16 @@ kbd.cd-kbd {
    DASHBOARD page
    ──────────────────────────────────────────────────────────────────────── */
 .cd-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: var(--d-gap-grid); align-items: stretch; }
-.cd-span-4 { grid-column: span 4; display: flex; flex-direction: column; }
-.cd-span-5 { grid-column: span 5; display: flex; flex-direction: column; }
-.cd-span-7 { grid-column: span 7; display: flex; flex-direction: column; }
-.cd-span-8 { grid-column: span 8; display: flex; flex-direction: column; }
+.cd-span-4  { grid-column: span 4;  display: flex; flex-direction: column; }
+.cd-span-5  { grid-column: span 5;  display: flex; flex-direction: column; }
+.cd-span-7  { grid-column: span 7;  display: flex; flex-direction: column; }
+.cd-span-8  { grid-column: span 8;  display: flex; flex-direction: column; }
+.cd-span-12 { grid-column: span 12; display: flex; flex-direction: column; }
 .cd-span-4 > .cd-card,
 .cd-span-5 > .cd-card,
 .cd-span-7 > .cd-card,
-.cd-span-8 > .cd-card { flex: 1; display: flex; flex-direction: column; }
+.cd-span-8 > .cd-card,
+.cd-span-12 > .cd-card { flex: 1; display: flex; flex-direction: column; }
 
 .cd-obj-list { display: flex; flex-direction: column; }
 .cd-obj-row {
@@ -706,7 +714,7 @@ kbd.cd-kbd {
   border-color: var(--ink);
 }
 .cd-task.is-done .cd-task-title {
-  color: var(--ink-faint);
+  color: var(--ink-soft);
   text-decoration: line-through;
 }
 .cd-task-link {

@@ -111,6 +111,18 @@ function ObjectiveRow({
   )
 }
 
+function formatDueLabel(due_date: string | null | undefined): string | null {
+  if (!due_date) return null
+  const d = new Date(due_date + 'T00:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000)
+  if (diff < 0) return 'Overdue'
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  if (diff <= 6) return d.toLocaleDateString('en-GB', { weekday: 'short' })
+  return d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })
+}
+
 function TaskRow({
   t,
   onToggle,
@@ -119,6 +131,7 @@ function TaskRow({
   onToggle: (id: string, done: boolean) => void
 }) {
   const [done, setDone] = useState(t.done)
+  const dueLabel = formatDueLabel(t.due_date)
 
   async function handleToggle() {
     const next = !done
@@ -146,7 +159,7 @@ function TaskRow({
           <Icon name="target" size={10} /> {t.objective_label}
         </span>
       )}
-      <span className="cd-task-due">{t.due_label}</span>
+      {dueLabel && <span className="cd-task-due">{dueLabel}</span>}
     </li>
   )
 }
@@ -522,15 +535,24 @@ export function DashboardPage() {
                 </button>
               </div>
             ) : (
-              <div className="cd-empty" style={{ padding: '16px 0' }}>
-                No upcoming 1:1s.
+              <div className="cd-dash-empty">
+                <Icon name="users" size={24} />
+                <p className="cd-dash-empty-title">No 1:1s scheduled</p>
+                <p className="cd-dash-empty-sub">Keep momentum with regular check-ins</p>
+                <button
+                  type="button"
+                  className="cd-btn cd-btn-secondary cd-btn-tiny"
+                  onClick={() => navigate('/1on1s')}
+                >
+                  Schedule a 1:1
+                </button>
               </div>
             )}
           </Card>
         </div>
 
-        {/* ── Tasks ─────────────────────────────────────────────── span 7 */}
-        <div className="cd-span-7">
+        {/* ── Tasks ─────────────────────────────────────────────── span 8 */}
+        <div className="cd-span-8">
           <Card>
             <CardHeader
               title="This week"

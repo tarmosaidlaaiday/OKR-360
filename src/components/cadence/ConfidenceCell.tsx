@@ -9,7 +9,15 @@ interface ConfidenceCellProps {
 
 export function ConfidenceCell({ value, size = 24, showNum = true, current = false }: ConfidenceCellProps) {
   if (value == null) {
-    return <span className="cd-conf-empty" style={{ width: size, height: size, display: 'inline-block', borderRadius: 5 }} />
+    return (
+      <span
+        className="cd-conf-empty"
+        style={{ width: size, height: size, fontSize: Math.max(10, size * 0.4) }}
+        title="No confidence logged yet"
+      >
+        –
+      </span>
+    )
   }
   return (
     <span
