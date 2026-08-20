@@ -4,7 +4,7 @@ import {
   ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
   BarChart, Bar, Cell, LabelList,
-  PieChart, Pie,
+  // PieChart, Pie, // hidden with KPI donut — restore when KPIs re-enabled
 } from 'recharts'
 import { useAuth } from '../context/AuthContext'
 import { useCycle } from '../context/CycleContext'
@@ -170,12 +170,12 @@ export function AnalyticsPage() {
     score: +(c.score ?? 0).toFixed(2),
   }))
 
-  // KPI health pie
-  const kpiPieData = data ? [
-    { name: 'On track', value: data.kpiHealth.onTrack,  fill: '#1F7A4D' },
-    { name: 'At risk',  value: data.kpiHealth.atRisk,   fill: '#9A6A11' },
-    { name: 'Off plan', value: data.kpiHealth.offPlan,  fill: '#B23A3A' },
-  ].filter(d => d.value > 0) : []
+  // KPI health pie — hidden with KPI donut; restore when KPIs re-enabled
+  // const kpiPieData = data ? [
+  //   { name: 'On track', value: data.kpiHealth.onTrack,  fill: '#1F7A4D' },
+  //   { name: 'At risk',  value: data.kpiHealth.atRisk,   fill: '#9A6A11' },
+  //   { name: 'Off plan', value: data.kpiHealth.offPlan,  fill: '#B23A3A' },
+  // ].filter(d => d.value > 0) : []
 
   const ciRate   = data ? Math.round(data.checkInRate.submitted / Math.max(data.checkInRate.total, 1) * 100) : 0
   const ciGaps   = data ? data.checkInRate.total - data.checkInRate.submitted : 0
@@ -237,12 +237,14 @@ export function AnalyticsPage() {
               hint={`${ciGaps > 0 ? ciGaps + ' gap' + (ciGaps !== 1 ? 's' : '') + ' remaining' : 'All objectives aligned'}`}
               tone={data.alignmentRate === 100 ? 'ok' : data.alignmentRate < 70 ? 'bad' : undefined}
             />
+            {/* KPI health stat hidden: UPDATE RLS bug pending fix — un-comment when KPIs re-enabled
             <StatCard
               label="KPI health"
               value={`${data.kpiHealth.onTrack}/${data.kpiHealth.onTrack + data.kpiHealth.atRisk + data.kpiHealth.offPlan}`}
               hint="On track this cycle"
               tone={data.kpiHealth.offPlan === 0 ? 'ok' : undefined}
             />
+            */}
           </div>
 
           {/* ── Section 1: Confidence trend ────────────────────────── */}
@@ -424,7 +426,7 @@ export function AnalyticsPage() {
               </Card>
             </div>
 
-            {/* KPI health donut — 5 cols */}
+            {/* KPI health donut hidden: UPDATE RLS bug pending fix — un-comment when KPIs re-enabled
             <div className="cd-span-5">
               <Card>
                 <CardHeader title="KPI health snapshot" sub="This cycle" />
@@ -434,22 +436,10 @@ export function AnalyticsPage() {
                   <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <ResponsiveContainer width="60%" height="100%">
                       <PieChart>
-                        <Pie
-                          data={kpiPieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={44}
-                          outerRadius={70}
-                          dataKey="value"
-                          paddingAngle={2}
-                        >
-                          {kpiPieData.map((entry, i) => (
-                            <Cell key={i} fill={entry.fill} />
-                          ))}
+                        <Pie data={kpiPieData} cx="50%" cy="50%" innerRadius={44} outerRadius={70} dataKey="value" paddingAngle={2}>
+                          {kpiPieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                         </Pie>
-                        <Tooltip
-                          contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }}
-                        />
+                        <Tooltip contentStyle={{ background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, fontSize: 12 }} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
@@ -465,6 +455,7 @@ export function AnalyticsPage() {
                 )}
               </Card>
             </div>
+            */}
           </div>
 
           {/* ── Section 4: Team leaderboard (admin only) ───────────── */}
