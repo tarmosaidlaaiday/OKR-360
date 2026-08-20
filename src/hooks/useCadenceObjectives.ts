@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getConfidenceLogs } from '../services/confidence.service'
+import { getContainedCycleIds } from '../services/objectives.service'
 import { getQuarterWeeks, objectiveProgress } from '../lib/cadenceUtils'
 import type { CadenceObjective, CadenceKeyResult } from '../types/cadence'
 
@@ -15,6 +16,7 @@ export function useCadenceObjectives(cycleId: string | null, quarter: number, ye
     setError(null)
 
     async function load() {
+      const cycleIds = await getContainedCycleIds(cycleId!)
       const { data: objs, error } = await supabase
         .from('objectives')
         .select(`
@@ -26,7 +28,7 @@ export function useCadenceObjectives(cycleId: string | null, quarter: number, ye
           parent_objective:objectives!parent_objective_id(id, title),
           key_results(id, title, target_type, start_value, target_value, current_value, unit, owner_id, confidence)
         `)
-        .eq('cycle_id', cycleId)
+        .in('cycle_id', cycleIds)
         .order('created_at', { ascending: true })
 
       if (error || !objs) {

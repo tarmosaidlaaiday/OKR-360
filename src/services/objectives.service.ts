@@ -87,6 +87,28 @@ export const objectivesService = {
   },
 }
 
+// Returns the IDs of all cycles whose date range is fully contained within
+// the selected cycle's date range (including the selected cycle itself).
+// Used by browsing views so that e.g. "H2 2026" shows Q3+Q4 objectives.
+export async function getContainedCycleIds(selectedCycleId: string): Promise<string[]> {
+  const { data: selected } = await supabase
+    .from('cycles')
+    .select('start_date, end_date')
+    .eq('id', selectedCycleId)
+    .single()
+
+  if (!selected) return [selectedCycleId]
+
+  const { data: cycles } = await supabase
+    .from('cycles')
+    .select('id')
+    .gte('start_date', (selected as any).start_date)
+    .lte('end_date', (selected as any).end_date)
+
+  const ids = (cycles ?? []).map((c: any) => c.id as string)
+  return ids.length > 0 ? ids : [selectedCycleId]
+}
+
 export async function getChildObjectives(objectiveId: string): Promise<CadenceObjective[]> {
   const { data, error } = await supabase
     .from('objectives')
