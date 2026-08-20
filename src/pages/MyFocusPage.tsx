@@ -8,6 +8,7 @@ import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
 import { useKrTasks } from '../hooks/useKrTasks'
 import { getKpisForKeyResult } from '../services/kpis.service'
 import { getGuardrailKpis } from '../services/guardrails.service'
+import { ObjectiveForm } from '../components/objectives/ObjectiveForm'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -17,6 +18,7 @@ import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
 import { fmt, getQuarterWeeks, getCurrentWeekIdx } from '../lib/cadenceUtils'
 import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, GuardrailKpi } from '../types/cadence'
+import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
 
 // ── KPI status chip ───────────────────────────────────────────────────────
@@ -340,9 +342,10 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId, onDeleteObj, onDeleteKr }: {
+function FocusObjBlock({ obj, userId, onEditObj, onDeleteObj, onDeleteKr }: {
   obj: CadenceObjective
   userId: string
+  onEditObj?: (obj: CadenceObjective) => void
   onDeleteObj?: (id: string) => void
   onDeleteKr?: (objId: string, krId: string) => void
 }) {
@@ -387,6 +390,16 @@ function FocusObjBlock({ obj, userId, onDeleteObj, onDeleteKr }: {
             <Icon name={expanded ? 'chevron' : 'chevronR'} size={13} />
           </button>
           <span className="cd-okr-obj-title">{obj.title}</span>
+          {onEditObj && (
+            <button
+              type="button"
+              className="cd-row-delete-btn"
+              title="Edit objective"
+              onClick={e => { e.stopPropagation(); onEditObj(obj) }}
+            >
+              <Icon name="pencil" size={12} />
+            </button>
+          )}
           {onDeleteObj && (
             confirmDelete
               ? <DeleteConfirm onConfirm={() => onDeleteObj(obj.id)} onCancel={() => setConfirmDelete(false)} />
@@ -446,6 +459,19 @@ export function MyFocusPage() {
   const userId = profile?.id ?? null
   const { objectives, loading, error, setObjectives } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
 
+  const [editingObj, setEditingObj] = useState<CadenceObjective | null>(null)
+
+  async function handleUpdateObj(data: CreateObjectiveInput) {
+    if (!editingObj) return
+    const updated = await objectivesService.update(editingObj.id, data)
+    setObjectives(prev => prev.map(o =>
+      o.id === editingObj.id
+        ? { ...o, title: updated.title, description: updated.description ?? null, status: updated.status as string }
+        : o
+    ))
+    setEditingObj(null)
+  }
+
   async function handleDeleteObj(id: string) {
     await objectivesService.delete(id)
     setObjectives(prev => prev.filter(o => o.id !== id))
@@ -497,12 +523,20 @@ export function MyFocusPage() {
               key={obj.id}
               obj={obj}
               userId={profile!.id}
+              onEditObj={setEditingObj}
               onDeleteObj={handleDeleteObj}
               onDeleteKr={handleDeleteKr}
             />
           ))
         )}
       </div>
+
+      <ObjectiveForm
+        open={!!editingObj}
+        onClose={() => setEditingObj(null)}
+        onSubmit={handleUpdateObj}
+        objective={editingObj as unknown as Objective}
+      />
     </div>
   )
 }
