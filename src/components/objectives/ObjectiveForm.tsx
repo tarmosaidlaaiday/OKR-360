@@ -526,8 +526,8 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
           </label>
         )}
 
-        {/* Guardrail KPIs — available in both create and edit mode */}
-        {kpiOpts.length > 0 && (
+        {/* Guardrail KPIs hidden: KPIs nav hidden pending UPDATE RLS fix — un-comment when KPIs re-enabled */}
+        {false && kpiOpts.length > 0 && (
           <div className="cd-field">
             <span className="cd-field-lbl" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <Icon name="shield" size={13} />
