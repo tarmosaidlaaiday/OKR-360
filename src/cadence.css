@@ -216,10 +216,10 @@ button { font-family: inherit; }
 }
 .cd-side-link:hover { background: color-mix(in oklab, var(--ink) 6%, transparent); color: var(--ink); }
 .cd-side-link.is-on {
-  background: var(--bg-elev);
-  color: var(--ink);
+  background: color-mix(in oklab, var(--accent) 10%, var(--bg-elev));
+  color: var(--accent);
   font-weight: 500;
-  box-shadow: var(--shadow-card);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 .cd-side-badge {
   margin-left: auto;
