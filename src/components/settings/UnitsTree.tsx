@@ -446,7 +446,7 @@ function AIGeneratorPanel({ onGenerate, onCancel }: AIGeneratorPanelProps) {
       </p>
       <textarea
         className="cd-paste-textarea"
-        rows={4}
+        rows={7}
         placeholder="e.g. We're a 40-person marketing agency with Creative, Client Services, and Operations departments. Creative has Design and Copywriting teams."
         value={description}
         onChange={e => setDescription(e.target.value)}
