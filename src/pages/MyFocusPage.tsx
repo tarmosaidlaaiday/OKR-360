@@ -373,7 +373,7 @@ function FocusObjBlock({ obj, userId, onEditObj, onDeleteObj, onDeleteKr }: {
     <div className="cd-okr-obj-block" ref={objRef}>
       {/* Objective row */}
       <div
-        className="cd-okr-row cd-okr-row--obj"
+        className="cd-okr-row cd-okr-row--obj cd-row-deletable"
         onClick={() => setExpanded(e => !e)}
         style={{ cursor: 'pointer' }}
       >
