@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin:0; padding:0; background-color:#EDECFB; font-family:Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#EDECFB; padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:12px; overflow:hidden; max-width:480px; width:100%;">
+          <tr>
+            <td style="background-color:#211E4B; padding:32px 40px;">
+              <span style="font-family:Helvetica,Arial,sans-serif; font-size:22px; font-weight:bold; color:#FFFFFF; letter-spacing:-0.5px;">OKR&nbsp;360</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px;">
+              <h1 style="margin:0 0 16px; font-size:20px; line-height:1.4; color:#211E4B; font-weight:bold;">
+                You're invited to join {{ .Data.org_name }}
+              </h1>
+              <p style="margin:0 0 24px; font-size:15px; line-height:1.6; color:#5F5E75;">
+                Hi {{ .Data.full_name }}, you've been invited to OKR&nbsp;360 &mdash; where {{ .Data.org_name }} sets goals, tracks progress, and keeps everyone aligned each week.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="border-radius:8px; background-color:#5D5BE6;">
+                    <a href="{{ .ConfirmationURL }}"
+                       style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:bold; color:#FFFFFF; text-decoration:none; border-radius:8px;">
+                      Accept invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:28px 0 0; font-size:13px; line-height:1.6; color:#9A97C9;">
+                This link is unique to you and will expire after a few days. If you weren't expecting this invitation, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 40px; border-top:1px solid #EDECFB;">
+              <p style="margin:0; font-size:12px; color:#9A97C9;">
+                Sent by OKR&nbsp;360 on behalf of {{ .Data.org_name }}.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

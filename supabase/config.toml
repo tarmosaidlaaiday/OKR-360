@@ -1,4 +1,8 @@
-# For local development. Not required for production deployments.
+# This file is used both for local development AND is the source of truth
+# for `supabase config push` against the linked PRODUCTION project.
+# Every value here — including defaults — gets pushed as absolute truth,
+# overwriting whatever is currently live. See supabase/DEPLOYMENT.md for
+# the incident this caused and the checklist to follow before pushing.
 # Supabase CLI: https://supabase.com/docs/guides/cli
 
 project_id = "githzeldiwxkmruhaver"
@@ -23,6 +27,31 @@ enabled = true
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+site_url = "https://okr-360.netlify.app"
+additional_redirect_urls = ["https://okr-360.netlify.app/**", "https://okr-360.netlify.app/reset-password"]
 
+[auth.rate_limit]
+email_sent = 2
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+anonymous_users = 30
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+max_frequency = "1m"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.email.template.invite]
+subject = "You are invited to join OKR 360"
+content_path = "./supabase/templates/invite.html"
