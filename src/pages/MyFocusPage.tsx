@@ -7,7 +7,9 @@ import { useAuth } from '../context/AuthContext'
 import { useMyFocusObjectives } from '../hooks/useMyFocusObjectives'
 import { useKrTasks } from '../hooks/useKrTasks'
 import { getKpisForKeyResult } from '../services/kpis.service'
-import { getGuardrailKpis } from '../services/guardrails.service'
+// import { getGuardrailKpis } from '../services/guardrails.service' // hidden with Guardrail UI — restore when KPIs re-enabled
+import { getRelevantUnitsForObjectives } from '../services/relevance.service'
+import type { RelevantUnit } from '../services/relevance.service'
 import { ObjectiveForm } from '../components/objectives/ObjectiveForm'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
@@ -17,7 +19,7 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
 import { fmt, getQuarterWeeks, getCurrentWeekIdx } from '../lib/cadenceUtils'
-import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, GuardrailKpi } from '../types/cadence'
+import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
 import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
 
@@ -56,26 +58,8 @@ function KpiLinkChip({ kpi }: { kpi: LinkedKpiSummary }) {
   )
 }
 
-// ── Guardrail KPI chip ────────────────────────────────────────────────────
-
-function GuardrailChip({ g }: { g: GuardrailKpi }) {
-  const navigate = useNavigate()
-  const status = kpiStatusClass(g.actual, g.plan, g.good)
-  return (
-    <button
-      type="button"
-      className={`cd-guardrail-chip cd-guardrail-chip--${status}`}
-      onClick={() => navigate(`/kpis?highlight=${g.kpi_id}`)}
-      title={`Guardrail KPI: ${g.name}`}
-    >
-      <span className="cd-guardrail-chip-name">{g.name}</span>
-      <span className="cd-guardrail-chip-val">
-        {fmt(g.actual)}{g.unit}
-      </span>
-      {g.deteriorating && <span className="cd-guardrail-chip-warn" title="Deteriorating">↘</span>}
-    </button>
-  )
-}
+// ── Guardrail KPI chip — hidden while KPIs nav is hidden; restore when KPIs re-enabled ──
+// function GuardrailChip({ g }: { g: GuardrailKpi }) { ... }
 
 // ── Inline delete confirm (shared pattern) ────────────────────────────────
 
@@ -342,23 +326,23 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId, onEditObj, onDeleteObj, onDeleteKr }: {
+function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onDeleteKr }: {
   obj: CadenceObjective
   userId: string
+  relevantUnits?: RelevantUnit[]
   onEditObj?: (obj: CadenceObjective) => void
   onDeleteObj?: (id: string) => void
   onDeleteKr?: (objId: string, krId: string) => void
 }) {
   const [expanded, setExpanded] = useState(true)
-  const [guardrails, setGuardrails] = useState<GuardrailKpi[]>([])
+  // guardrails state hidden while KPIs nav is hidden — restore when KPIs re-enabled:
+  // const [guardrails, setGuardrails] = useState<GuardrailKpi[]>([])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const objRef = useRef<HTMLDivElement>(null)
   const [searchParams] = useSearchParams()
   const highlight = searchParams.get('highlight')
 
-  useEffect(() => {
-    getGuardrailKpis(obj.id).then(setGuardrails).catch(console.error)
-  }, [obj.id])
+  // useEffect(() => { getGuardrailKpis(obj.id).then(setGuardrails).catch(console.error) }, [obj.id])
 
   useEffect(() => {
     if (highlight === obj.id && objRef.current) {
@@ -423,7 +407,7 @@ function FocusObjBlock({ obj, userId, onEditObj, onDeleteObj, onDeleteKr }: {
         <div className="cd-okr-conf-row" />
       </div>
 
-      {/* Guardrail KPIs */}
+      {/* Guardrail KPIs hidden: KPIs nav hidden pending UPDATE RLS fix — un-comment when KPIs re-enabled
       {guardrails.length > 0 && (
         <div className="cd-guardrail-row">
           <span style={{ color: 'var(--ink-faint)', flexShrink: 0, display: 'flex' }}><Icon name="shield" size={12} /></span>
@@ -431,6 +415,17 @@ function FocusObjBlock({ obj, userId, onEditObj, onDeleteObj, onDeleteKr }: {
           <div className="cd-guardrail-chips">
             {guardrails.map(g => <GuardrailChip key={g.id} g={g} />)}
           </div>
+        </div>
+      )}
+      */}
+
+      {/* Relevant-to units */}
+      {relevantUnits && relevantUnits.length > 0 && (
+        <div className="cd-rel-units-row">
+          <span className="cd-rel-units-label">Relevant to</span>
+          {relevantUnits.map(ru => (
+            <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
+          ))}
         </div>
       )}
 
@@ -460,6 +455,14 @@ export function MyFocusPage() {
   const { objectives, loading, error, setObjectives } = useMyFocusObjectives(activeCycle?.id ?? null, userId, quarter, year)
 
   const [editingObj, setEditingObj] = useState<CadenceObjective | null>(null)
+  const [relevantUnitsMap, setRelevantUnitsMap] = useState<Map<string, RelevantUnit[]>>(new Map())
+
+  useEffect(() => {
+    if (objectives.length === 0) return
+    getRelevantUnitsForObjectives(objectives.map(o => o.id))
+      .then(setRelevantUnitsMap)
+      .catch(console.error)
+  }, [objectives])
 
   async function handleUpdateObj(data: CreateObjectiveInput) {
     if (!editingObj) return
@@ -523,6 +526,7 @@ export function MyFocusPage() {
               key={obj.id}
               obj={obj}
               userId={profile!.id}
+              relevantUnits={relevantUnitsMap.get(obj.id)}
               onEditObj={setEditingObj}
               onDeleteObj={handleDeleteObj}
               onDeleteKr={handleDeleteKr}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useCycle } from '../context/CycleContext'
@@ -22,6 +22,8 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Segmented } from '../components/cadence/Segmented'
 import { Icon } from '../components/cadence/Icon'
 import { getQuarterWeeks, getCurrentWeekIdx, fmt } from '../lib/cadenceUtils'
+import { getRelevantUnitsForObjectives } from '../services/relevance.service'
+import type { RelevantUnit } from '../services/relevance.service'
 import type { CreateObjectiveInput } from '../types'
 import type { CadenceObjective } from '../types/cadence'
 import { usePageTitle } from '../hooks/usePageTitle'
@@ -69,46 +71,57 @@ function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCance
   )
 }
 
-function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0, onDelete }: {
+function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0, onDelete, relevantUnits }: {
   obj: CadenceObjective; weeks: number[]; currentWeekIdx: number
   expanded: boolean; onToggle: () => void; isTopLevel: boolean
   indentDepth?: number; onDelete?: (id: string) => void
+  relevantUnits?: RelevantUnit[]
 }) {
   const indent = indentDepth * 20
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
-    <div id={`obj-${obj.id}`} className="cd-okr-row cd-okr-row--obj cd-row-deletable"
-      onClick={onToggle} style={{ '--row-indent': `${indent}px` } as React.CSSProperties}>
-      <div className="cd-okr-col-level"><LevelBadge level={obj.level} size="sm" /></div>
-      <div className="cd-okr-col-title" style={{ paddingLeft: indent }}>
-        <button className="cd-okr-expand" type="button" aria-label="Toggle KRs"
-          onClick={e => { e.stopPropagation(); onToggle() }}>
-          <Icon name={expanded ? 'chevron' : 'chevronR'} size={13} />
-        </button>
-        <span className="cd-okr-obj-title">{obj.title}</span>
-        {onDelete && (confirmDelete
-          ? <DeleteConfirm onConfirm={() => onDelete(obj.id)} onCancel={() => setConfirmDelete(false)} />
-          : <button type="button" className="cd-row-delete-btn" title="Delete objective"
-              onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}>
-              <Icon name="trash" size={13} />
-            </button>
-        )}
+    <>
+      <div id={`obj-${obj.id}`} className="cd-okr-row cd-okr-row--obj cd-row-deletable"
+        onClick={onToggle} style={{ '--row-indent': `${indent}px` } as React.CSSProperties}>
+        <div className="cd-okr-col-level"><LevelBadge level={obj.level} size="sm" /></div>
+        <div className="cd-okr-col-title" style={{ paddingLeft: indent }}>
+          <button className="cd-okr-expand" type="button" aria-label="Toggle KRs"
+            onClick={e => { e.stopPropagation(); onToggle() }}>
+            <Icon name={expanded ? 'chevron' : 'chevronR'} size={13} />
+          </button>
+          <span className="cd-okr-obj-title">{obj.title}</span>
+          {onDelete && (confirmDelete
+            ? <DeleteConfirm onConfirm={() => onDelete(obj.id)} onCancel={() => setConfirmDelete(false)} />
+            : <button type="button" className="cd-row-delete-btn" title="Delete objective"
+                onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}>
+                <Icon name="trash" size={13} />
+              </button>
+          )}
+        </div>
+        <div className="cd-okr-col-supports">
+          <AlignmentPill parent={obj.parent_objective ?? null} required={!isTopLevel}
+            onNavigate={id => document.getElementById(`obj-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />
+        </div>
+        <div className="cd-okr-col-owner"><Avatar person={obj.owner ?? null} size={22} /></div>
+        <div className="cd-okr-col-status"><StatusChip status={obj.status} size="sm" /></div>
+        <div className="cd-okr-col-progress">
+          <ProgressBar value={obj.progress} height={5} />
+          <span className="cd-okr-pct">{fmt(obj.progress * 100)}%</span>
+        </div>
+        <div className="cd-okr-conf-row">
+          <ConfidenceTrend values={obj.confidence} currentIdx={currentWeekIdx} weeks={weeks} size={20} />
+        </div>
       </div>
-      <div className="cd-okr-col-supports">
-        <AlignmentPill parent={obj.parent_objective ?? null} required={!isTopLevel}
-          onNavigate={id => document.getElementById(`obj-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />
-      </div>
-      <div className="cd-okr-col-owner"><Avatar person={obj.owner ?? null} size={22} /></div>
-      <div className="cd-okr-col-status"><StatusChip status={obj.status} size="sm" /></div>
-      <div className="cd-okr-col-progress">
-        <ProgressBar value={obj.progress} height={5} />
-        <span className="cd-okr-pct">{fmt(obj.progress * 100)}%</span>
-      </div>
-      <div className="cd-okr-conf-row">
-        <ConfidenceTrend values={obj.confidence} currentIdx={currentWeekIdx} weeks={weeks} size={20} />
-      </div>
-    </div>
+      {relevantUnits && relevantUnits.length > 0 && (
+        <div className="cd-rel-units-row">
+          <span className="cd-rel-units-label">Relevant to</span>
+          {relevantUnits.map(ru => (
+            <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -181,6 +194,14 @@ function AllOKRsTab() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [levelFilter, setLevelFilter] = useState<string | null>(null)
+  const [relevantUnitsMap, setRelevantUnitsMap] = useState<Map<string, RelevantUnit[]>>(new Map())
+
+  useEffect(() => {
+    if (objectives.length === 0) return
+    getRelevantUnitsForObjectives(objectives.map(o => o.id))
+      .then(setRelevantUnitsMap)
+      .catch(console.error)
+  }, [objectives])
 
   async function handleDeleteObj(id: string) {
     await objectivesService.delete(id)
@@ -276,6 +297,7 @@ function AllOKRsTab() {
                 isTopLevel={!obj.parent_objective_id}
                 indentDepth={viewMode === 'cascade' ? depth : 0}
                 onDelete={handleDeleteObj}
+                relevantUnits={relevantUnitsMap.get(obj.id)}
               />
               {isExpanded && obj.key_results.length > 0 && obj.key_results.map(kr => (
                 <KrRow key={kr.id} kr={kr} weeks={weeks} currentWeekIdx={currentWeekIdx}

@@ -14,6 +14,8 @@ import { Segmented } from '../components/cadence/Segmented'
 import { confidenceColor } from '../lib/colors'
 import { profileToPerson, getCurrentWeekIdx, getISOWeek } from '../lib/cadenceUtils'
 import { toggleTask, addQuickTask } from '../services/tasks.service'
+import { getRelevantUnitsForObjectives } from '../services/relevance.service'
+import type { RelevantUnit } from '../services/relevance.service'
 import { usePageActionStore } from '../stores/pageActionStore'
 import { useCascadeChain } from '../hooks/useCascadeChain'
 import type { Task, OneOnOne, Person } from '../types/cadence'
@@ -64,10 +66,11 @@ function filterByPeriod(tasks: Task[], period: Period): Task[] {
 // ── Sub-components ────────────────────────────────────────────────────────
 
 function ObjectiveRow({
-  o, weekIdx,
+  o, weekIdx, relevantUnits,
 }: {
   o: CadenceObjective
   weekIdx: number
+  relevantUnits?: RelevantUnit[]
 }) {
   const navigate = useNavigate()
   const conf  = o.confidence[weekIdx] ?? null
@@ -93,6 +96,14 @@ function ObjectiveRow({
           <Icon name="grid" size={11} /> {o.unit?.name ?? 'No unit'}
         </div>
         <div className="cd-obj-title">{o.title}</div>
+        {relevantUnits && relevantUnits.length > 0 && (
+          <div className="cd-rel-units-row" style={{ padding: '3px 0 0', border: 'none' }}>
+            <span className="cd-rel-units-label">Relevant to</span>
+            {relevantUnits.map(ru => (
+              <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
+            ))}
+          </div>
+        )}
         <div className="cd-obj-krs">
           {(o.key_results ?? []).map(kr => (
             <span key={kr.id} className="cd-obj-kr">
@@ -243,6 +254,15 @@ export function DashboardPage() {
     o.owner_id === user?.id ||
     (o.key_results ?? []).some(kr => kr.owner_id === user?.id),
   )
+
+  const [relevantUnitsMap, setRelevantUnitsMap] = useState<Map<string, RelevantUnit[]>>(new Map())
+  useEffect(() => {
+    if (myObjs.length === 0) return
+    getRelevantUnitsForObjectives(myObjs.map(o => o.id))
+      .then(setRelevantUnitsMap)
+      .catch(console.error)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myObjs.map(o => o.id).join(',')])
 
   // Compute org confidence avg for current week
   useEffect(() => {
@@ -486,7 +506,7 @@ export function DashboardPage() {
                 </div>
               )}
               {myObjs.map(o => (
-                <ObjectiveRow key={o.id} o={o} weekIdx={weekIdx} />
+                <ObjectiveRow key={o.id} o={o} weekIdx={weekIdx} relevantUnits={relevantUnitsMap.get(o.id)} />
               ))}
             </div>
           </Card>
