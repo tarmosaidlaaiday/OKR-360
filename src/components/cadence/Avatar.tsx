@@ -1,5 +1,10 @@
 import type { Person } from '../../types/cadence'
 
+function deriveInitials(name: string | null | undefined): string {
+  if (!name) return '?'
+  return name.trim().split(/\s+/).slice(0, 2).map(n => n[0]?.toUpperCase() ?? '').join('')
+}
+
 interface AvatarProps {
   person: Person | null | undefined
   size?: number
@@ -35,7 +40,7 @@ export function Avatar({ person, size = 24, ring = false }: AvatarProps) {
         boxShadow: ring ? '0 0 0 2px var(--bg)' : 'none',
       }}
     >
-      {person.initials}
+      {person.initials || deriveInitials(person.name)}
     </span>
   )
 }
