@@ -111,7 +111,8 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
   const [linkedKpis, setLinkedKpis] = useState<LinkedKpiSummary[]>([])
   const [confirmDeleteKr, setConfirmDeleteKr] = useState(false)
 
-  // Add-task form state
+  // Add-task form state (collapsed by default)
+  const [addingTask, setAddingTask] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newAssignee, setNewAssignee] = useState('')
   const [newDueDate, setNewDueDate] = useState('')
@@ -135,13 +136,18 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
     updateStatus(task.id, next)
   }
 
+  function cancelAdd() {
+    setAddingTask(false)
+    setNewTitle('')
+    setNewAssignee('')
+    setNewDueDate('')
+  }
+
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault()
     const title = newTitle.trim()
     if (!title) return
-    setNewTitle('')
-    setNewAssignee('')
-    setNewDueDate('')
+    cancelAdd()
     await addTask(title, newAssignee || null, newDueDate || null)
   }
 
@@ -205,120 +211,124 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
         <div className="cd-okr-conf-row" />
       </div>
 
-      {/* Inline task list */}
-      <div className="cd-kr-task-list">
-        {tasks.map(task => (
-          <div key={task.id}>
-            {editId === task.id ? (
-              /* ── Inline edit row ── */
-              <div className="cd-kr-task-row" style={{ flexWrap: 'wrap', gap: 6 }}>
-                <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
-                <input
-                  className="cd-kr-task-add-input"
-                  value={editFields.title}
-                  onChange={e => setEditFields(f => ({ ...f, title: e.target.value }))}
-                  style={{ flex: 1, minWidth: 100 }}
-                  autoFocus
-                />
-                <select
-                  className="cd-um-select"
-                  value={editFields.assignee_id}
-                  onChange={e => setEditFields(f => ({ ...f, assignee_id: e.target.value }))}
-                  style={{ fontSize: 12, padding: '2px 6px' }}
-                >
-                  <option value="">No assignee</option>
-                  {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </select>
-                <input
-                  type="date"
-                  className="cd-um-input"
-                  value={editFields.due_date}
-                  onChange={e => setEditFields(f => ({ ...f, due_date: e.target.value }))}
-                  style={{ fontSize: 12, padding: '2px 6px', width: 130 }}
-                />
-                <button type="button" className="cd-btn cd-btn-primary"
-                  style={{ fontSize: 11, padding: '2px 8px' }}
-                  onClick={() => saveEdit(task.id)}>
-                  Save
-                </button>
-                <button type="button" className="cd-btn"
-                  style={{ fontSize: 11, padding: '2px 8px' }}
-                  onClick={() => setEditId(null)}>
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              /* ── Display row ── */
-              <div className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
-                <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
-                {task.assignee && (
-                  <Avatar
-                    person={task.assignee as any}
-                    size={16}
-                  />
+      {/* Task section: list + add control */}
+      <div className="cd-kr-task-section">
+        {tasks.length > 0 && (
+          <div className="cd-kr-task-list">
+            {tasks.map(task => (
+              <div key={task.id}>
+                {editId === task.id ? (
+                  /* ── Inline edit row ── */
+                  <div className="cd-kr-task-row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                    <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                    <input
+                      className="cd-kr-task-add-input"
+                      value={editFields.title}
+                      onChange={e => setEditFields(f => ({ ...f, title: e.target.value }))}
+                      style={{ flex: 1, minWidth: 80 }}
+                      autoFocus
+                    />
+                    <select
+                      className="cd-um-select"
+                      value={editFields.assignee_id}
+                      onChange={e => setEditFields(f => ({ ...f, assignee_id: e.target.value }))}
+                      style={{ width: 100, flexShrink: 0, fontSize: 12, padding: '2px 4px' }}
+                    >
+                      <option value="">No assignee</option>
+                      {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                    </select>
+                    <input
+                      type="date"
+                      className="cd-um-input"
+                      value={editFields.due_date}
+                      onChange={e => setEditFields(f => ({ ...f, due_date: e.target.value }))}
+                      style={{ width: 108, flexShrink: 0, fontSize: 12, padding: '2px 4px' }}
+                    />
+                    <button type="button" className="cd-btn cd-btn-primary"
+                      style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                      onClick={() => saveEdit(task.id)}>
+                      Save
+                    </button>
+                    <button type="button" className="cd-btn"
+                      style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+                      onClick={() => setEditId(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  /* ── Display row ── */
+                  <div className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
+                    <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                    {task.assignee && <Avatar person={task.assignee as any} size={16} />}
+                    <span className="cd-kr-task-title">{task.title}</span>
+                    {task.due_date && (
+                      <span style={{
+                        fontSize: 11,
+                        color: isOverdue(task.due_date, task.status) ? 'var(--bad)' : 'var(--ink-faint)',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {fmtDate(task.due_date)}
+                      </span>
+                    )}
+                    <button type="button" className="cd-kr-task-del cd-btn-icon"
+                      onClick={() => startEdit(task)} title="Edit task">
+                      <Icon name="pencil" size={11} />
+                    </button>
+                    <button type="button" className="cd-kr-task-del cd-btn-icon"
+                      onClick={() => removeTask(task.id)} title="Remove task">
+                      <Icon name="x" size={11} />
+                    </button>
+                  </div>
                 )}
-                <span className="cd-kr-task-title">{task.title}</span>
-                {task.due_date && (
-                  <span style={{
-                    fontSize: 11,
-                    color: isOverdue(task.due_date, task.status) ? 'var(--bad)' : 'var(--ink-faint)',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {fmtDate(task.due_date)}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="cd-kr-task-del cd-btn-icon"
-                  onClick={() => startEdit(task)}
-                  title="Edit task"
-                >
-                  <Icon name="pencil" size={11} />
-                </button>
-                <button
-                  type="button"
-                  className="cd-kr-task-del cd-btn-icon"
-                  onClick={() => removeTask(task.id)}
-                  title="Remove task"
-                >
-                  <Icon name="x" size={11} />
-                </button>
               </div>
-            )}
+            ))}
           </div>
-        ))}
+        )}
 
-        {/* Add task form */}
-        <form className="cd-kr-task-add" onSubmit={handleAddTask} style={{ flexWrap: 'wrap', gap: 4 }}>
-          <button type="submit" className="cd-kr-task-check" style={{ opacity: 0.35 }} tabIndex={-1}>
-            <Icon name="plus" size={10} />
+        {/* Add task: collapsed button or expanded form */}
+        {addingTask ? (
+          <form className="cd-kr-task-add" onSubmit={handleAddTask} style={{ flexWrap: 'nowrap', gap: 6 }}>
+            <input
+              className="cd-kr-task-add-input"
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              placeholder="Task title…"
+              style={{ flex: 1, minWidth: 80 }}
+              autoFocus
+            />
+            <select
+              className="cd-um-select"
+              value={newAssignee}
+              onChange={e => setNewAssignee(e.target.value)}
+              style={{ width: 100, flexShrink: 0, fontSize: 12, padding: '2px 4px' }}
+              title="Assignee (optional)"
+            >
+              <option value="">Assign…</option>
+              {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            </select>
+            <input
+              type="date"
+              className="cd-um-input"
+              value={newDueDate}
+              onChange={e => setNewDueDate(e.target.value)}
+              style={{ width: 108, flexShrink: 0, fontSize: 12, padding: '2px 4px' }}
+              title="Due date (optional)"
+            />
+            <button type="submit" className="cd-btn cd-btn--primary"
+              style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}>
+              Add
+            </button>
+            <button type="button" className="cd-btn"
+              style={{ fontSize: 11, padding: '2px 8px', flexShrink: 0 }}
+              onClick={cancelAdd}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="cd-kr-task-add-btn" onClick={() => setAddingTask(true)}>
+            + Add task
           </button>
-          <input
-            className="cd-kr-task-add-input"
-            value={newTitle}
-            onChange={e => setNewTitle(e.target.value)}
-            placeholder="Add task…"
-            style={{ flex: 1, minWidth: 120 }}
-          />
-          <select
-            className="cd-um-select"
-            value={newAssignee}
-            onChange={e => setNewAssignee(e.target.value)}
-            style={{ fontSize: 12, padding: '2px 6px' }}
-            title="Assignee (optional)"
-          >
-            <option value="">Assign…</option>
-            {people.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-          </select>
-          <input
-            type="date"
-            className="cd-um-input"
-            value={newDueDate}
-            onChange={e => setNewDueDate(e.target.value)}
-            style={{ fontSize: 12, padding: '2px 6px', width: 130 }}
-            title="Due date (optional)"
-          />
-        </form>
+        )}
       </div>
     </div>
   )
