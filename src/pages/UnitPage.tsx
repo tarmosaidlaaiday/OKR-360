@@ -103,7 +103,7 @@ export function UnitPage() {
                       <span style={{ fontSize: 12, color: 'var(--ink-soft)', flexShrink: 0 }}>
                         {fmt(obj.progress * 100)}%
                       </span>
-                      <Avatar person={obj.owner ?? null} size={18} />
+                      <Avatar person={obj.owner ? profileToPerson(obj.owner as any) : null} size={18} />
                     </div>
                   </div>
                 ))}

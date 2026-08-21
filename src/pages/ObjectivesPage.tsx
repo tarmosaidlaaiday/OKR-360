@@ -21,7 +21,7 @@ import { Avatar } from '../components/cadence/Avatar'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Segmented } from '../components/cadence/Segmented'
 import { Icon } from '../components/cadence/Icon'
-import { getQuarterWeeks, getCurrentWeekIdx, fmt } from '../lib/cadenceUtils'
+import { getQuarterWeeks, getCurrentWeekIdx, fmt, profileToPerson } from '../lib/cadenceUtils'
 import { getRelevantUnitsForObjectives } from '../services/relevance.service'
 import type { RelevantUnit } from '../services/relevance.service'
 import type { CreateObjectiveInput } from '../types'
@@ -103,7 +103,7 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
           <AlignmentPill parent={obj.parent_objective ?? null} required={!isTopLevel}
             onNavigate={id => document.getElementById(`obj-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })} />
         </div>
-        <div className="cd-okr-col-owner"><Avatar person={obj.owner ?? null} size={22} /></div>
+        <div className="cd-okr-col-owner"><Avatar person={obj.owner ? profileToPerson(obj.owner as any) : null} size={22} /></div>
         <div className="cd-okr-col-status"><StatusChip status={obj.status} size="sm" /></div>
         <div className="cd-okr-col-progress">
           <ProgressBar value={obj.progress} height={5} />
@@ -145,7 +145,7 @@ function KrRow({ kr, weeks, currentWeekIdx, onDelete }: {
         )}
       </div>
       <div className="cd-okr-col-supports" />
-      <div className="cd-okr-col-owner"><Avatar person={kr.owner ?? null} size={18} /></div>
+      <div className="cd-okr-col-owner"><Avatar person={kr.owner ? profileToPerson(kr.owner as any) : null} size={18} /></div>
       <div className="cd-okr-col-status" />
       <div className="cd-okr-col-progress">
         {kr.target_type !== 'boolean' ? (

@@ -9,7 +9,7 @@ import { LevelBadge } from '../components/cadence/LevelBadge'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Avatar } from '../components/cadence/Avatar'
 import { Icon } from '../components/cadence/Icon'
-import { fmt } from '../lib/cadenceUtils'
+import { fmt, profileToPerson } from '../lib/cadenceUtils'
 import type { CadenceObjective } from '../types/cadence'
 
 // ── Single objective's contribution chain ────────────────────────────────
@@ -64,9 +64,9 @@ function ChainView({ obj }: { obj: CadenceObjective }) {
               <LevelBadge level={node.level} size="sm" />
               <div className="cd-cascade-node-title">{node.title}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Avatar person={node.owner ?? null} size={16} />
+                <Avatar person={node.owner ? profileToPerson(node.owner as any) : null} size={16} />
                 <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
-                  {(node.owner as any)?.name ?? (node.owner as any)?.full_name ?? ''}
+                  {(node.owner as any)?.full_name ?? (node.owner as any)?.name ?? ''}
                 </span>
               </div>
             </div>
@@ -115,7 +115,7 @@ function ChildList({ children }: { children: CadenceObjective[] }) {
             <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
               {fmt(child.progress * 100)}%
             </span>
-            <Avatar person={child.owner ?? null} size={16} />
+            <Avatar person={child.owner ? profileToPerson(child.owner as any) : null} size={16} />
           </div>
         ))}
       </div>

@@ -116,7 +116,7 @@ function ObjectiveRow({
         </div>
       </div>
       <div className="cd-obj-owner">
-        <Avatar person={o.owner ?? null} size={26} />
+        <Avatar person={o.owner ? profileToPerson(o.owner as any) : null} size={26} />
       </div>
     </a>
   )

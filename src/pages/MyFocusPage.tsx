@@ -18,7 +18,7 @@ import { Avatar } from '../components/cadence/Avatar'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
-import { fmt, getQuarterWeeks, getCurrentWeekIdx } from '../lib/cadenceUtils'
+import { fmt, getQuarterWeeks, getCurrentWeekIdx, profileToPerson } from '../lib/cadenceUtils'
 import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
 import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
@@ -193,7 +193,7 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
         </div>
         <div className="cd-okr-col-supports" />
         <div className="cd-okr-col-owner">
-          <Avatar person={kr.owner ?? null} size={18} />
+          <Avatar person={kr.owner ? profileToPerson(kr.owner as any) : null} size={18} />
         </div>
         <div className="cd-okr-col-status" />
         <div className="cd-okr-col-progress">
@@ -259,7 +259,7 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
                   /* ── Display row ── */
                   <div className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
                     <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
-                    {task.assignee && <Avatar person={task.assignee as any} size={16} />}
+                    {task.assignee && <Avatar person={profileToPerson(task.assignee as any)} size={16} />}
                     <span className="cd-kr-task-title">{task.title}</span>
                     {task.due_date && (
                       <span style={{
@@ -405,7 +405,7 @@ function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onD
         </div>
         <div className="cd-okr-col-supports" />
         <div className="cd-okr-col-owner">
-          <Avatar person={obj.owner ?? null} size={22} />
+          <Avatar person={obj.owner ? profileToPerson(obj.owner as any) : null} size={22} />
         </div>
         <div className="cd-okr-col-status">
           <StatusChip status={obj.status} size="sm" />
