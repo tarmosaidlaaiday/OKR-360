@@ -12,6 +12,7 @@ import { getRelevantUnitsForObjectives } from '../services/relevance.service'
 import type { RelevantUnit } from '../services/relevance.service'
 import { ObjectiveForm } from '../components/objectives/ObjectiveForm'
 import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
+import { ConfidenceCell } from '../components/cadence/ConfidenceCell'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -106,10 +107,12 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 
 // ── KR row with inline task list ─────────────────────────────────────────
 
-function KrWithTasks({ kr, userId, objTitle, onDelete, onOpenTask }: {
+function KrWithTasks({ kr, userId, objTitle, weeks, currentWeekIdx, onDelete, onOpenTask }: {
   kr: CadenceKeyResult
   userId: string
   objTitle: string
+  weeks: number[]
+  currentWeekIdx: number
   onDelete?: (id: string) => void
   onOpenTask?: (task: UnifiedTask) => void
 }) {
@@ -215,7 +218,13 @@ function KrWithTasks({ kr, userId, objTitle, onDelete, onOpenTask }: {
             <span className="cd-okr-pct">{kr.current_value ? 'Done' : 'Not done'}</span>
           )}
         </div>
-        <div className="cd-okr-conf-row" />
+        <div className="cd-okr-conf-row">
+          {weeks.map((w, i) => (
+            <span key={w} className="cd-okr-week">
+              <ConfidenceCell value={kr.confidence[i] ?? null} size={18} showNum={false} current={i === currentWeekIdx} />
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Task section: list + add control */}
@@ -360,10 +369,12 @@ function KrWithTasks({ kr, userId, objTitle, onDelete, onOpenTask }: {
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onDeleteKr, onOpenTask }: {
+function FocusObjBlock({ obj, userId, relevantUnits, weeks, currentWeekIdx, onEditObj, onDeleteObj, onDeleteKr, onOpenTask }: {
   obj: CadenceObjective
   userId: string
   relevantUnits?: RelevantUnit[]
+  weeks: number[]
+  currentWeekIdx: number
   onEditObj?: (obj: CadenceObjective) => void
   onDeleteObj?: (id: string) => void
   onDeleteKr?: (objId: string, krId: string) => void
@@ -471,6 +482,8 @@ function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onD
           kr={kr}
           userId={userId}
           objTitle={obj.title}
+          weeks={weeks}
+          currentWeekIdx={currentWeekIdx}
           onDelete={onDeleteKr ? (krId) => onDeleteKr(obj.id, krId) : undefined}
           onOpenTask={onOpenTask}
         />
@@ -565,6 +578,8 @@ export function MyFocusPage() {
               obj={obj}
               userId={profile!.id}
               relevantUnits={relevantUnitsMap.get(obj.id)}
+              weeks={weeks}
+              currentWeekIdx={currentWeekIdx}
               onEditObj={setEditingObj}
               onDeleteObj={handleDeleteObj}
               onDeleteKr={handleDeleteKr}
