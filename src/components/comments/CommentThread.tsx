@@ -7,6 +7,8 @@ interface CommentThreadProps {
   objectiveId?: string
   krId?: string
   kpiId?: string
+  krTaskId?: string
+  personalTaskId?: string
 }
 
 function timeAgo(iso: string): string {
@@ -29,7 +31,7 @@ function Initials({ name }: { name: string }) {
   )
 }
 
-export function CommentThread({ objectiveId, krId, kpiId }: CommentThreadProps) {
+export function CommentThread({ objectiveId, krId, kpiId, krTaskId, personalTaskId }: CommentThreadProps) {
   const { user } = useAuth()
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,13 +46,17 @@ export function CommentThread({ objectiveId, krId, kpiId }: CommentThreadProps) 
       ? commentsService.getByObjective(objectiveId)
       : kpiId
         ? commentsService.getByKPI(kpiId)
-        : commentsService.getByKR(krId!)
+        : krTaskId
+          ? commentsService.getByKrTask(krTaskId)
+          : personalTaskId
+            ? commentsService.getByPersonalTask(personalTaskId)
+            : commentsService.getByKR(krId!)
     fetch
       .then(data => { if (active) setComments(data) })
       .catch(err => { console.error('CommentThread: fetch failed', err) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [objectiveId, krId, kpiId])
+  }, [objectiveId, krId, kpiId, krTaskId, personalTaskId])
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault()
@@ -61,7 +67,15 @@ export function CommentThread({ objectiveId, krId, kpiId }: CommentThreadProps) 
       const comment = await commentsService.create({
         body: text,
         author_id: user.id,
-        ...(objectiveId ? { objective_id: objectiveId } : kpiId ? { kpi_id: kpiId } : { key_result_id: krId }),
+        ...(objectiveId
+          ? { objective_id: objectiveId }
+          : kpiId
+            ? { kpi_id: kpiId }
+            : krTaskId
+              ? { kr_task_id: krTaskId }
+              : personalTaskId
+                ? { personal_task_id: personalTaskId }
+                : { key_result_id: krId }),
       })
       setComments(prev => [...prev, comment])
       setBody('')

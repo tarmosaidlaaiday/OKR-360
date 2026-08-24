@@ -5,6 +5,7 @@ import { updateKrTaskStatus } from '../services/krTasks.service'
 import { Avatar } from '../components/cadence/Avatar'
 import { Icon } from '../components/cadence/Icon'
 import { getErrorMessage } from '../lib/errors'
+import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
 import type { UnifiedTask, KrTaskStatus } from '../types/cadence'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -37,7 +38,11 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 
 // ── Unified task row ──────────────────────────────────────────────────────
 
-function TaskRow({ task, onStatusChange }: { task: UnifiedTask; onStatusChange: (id: string, status: KrTaskStatus) => void }) {
+function TaskRow({ task, onStatusChange, onOpen }: {
+  task: UnifiedTask
+  onStatusChange: (id: string, status: KrTaskStatus) => void
+  onOpen: (task: UnifiedTask) => void
+}) {
   const overdue = isOverdue(task.due_date, task.status)
   const dateLabel = fmtDate(task.due_date)
 
@@ -48,8 +53,12 @@ function TaskRow({ task, onStatusChange }: { task: UnifiedTask; onStatusChange: 
   }
 
   return (
-    <div className={`cd-ut-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
-      <TaskCheck status={task.status} onClick={cycleStatus} />
+    <div
+      className={`cd-ut-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}
+      style={{ cursor: 'pointer' }}
+      onClick={() => onOpen(task)}
+    >
+      <TaskCheck status={task.status} onClick={e => { e.stopPropagation(); cycleStatus() }} />
       {task.assignee && (
         <Avatar
           person={{
@@ -89,6 +98,7 @@ export function TasksPage() {
   const [error, setError] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null)
 
   // Quick-add
   const [addTitle, setAddTitle] = useState('')
@@ -241,7 +251,12 @@ export function TasksPage() {
 
         <div className="cd-kr-task-list" style={{ marginTop: loading || filtered.length === 0 ? 0 : 8 }}>
           {filtered.map(task => (
-            <TaskRow key={task.id} task={task} onStatusChange={handleStatusChange} />
+            <TaskRow
+              key={task.id}
+              task={task}
+              onStatusChange={handleStatusChange}
+              onOpen={setSelectedTask}
+            />
           ))}
         </div>
 
@@ -276,6 +291,17 @@ export function TasksPage() {
           </button>
         </form>
       </div>
+
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onTaskUpdate={fields => {
+            setTasks(prev => prev.map(t => t.id === selectedTask.id ? { ...t, ...fields } : t))
+            setSelectedTask(prev => prev ? { ...prev, ...fields } : prev)
+          }}
+        />
+      )}
     </div>
   )
 }

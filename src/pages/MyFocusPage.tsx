@@ -11,6 +11,7 @@ import { getKpisForKeyResult } from '../services/kpis.service'
 import { getRelevantUnitsForObjectives } from '../services/relevance.service'
 import type { RelevantUnit } from '../services/relevance.service'
 import { ObjectiveForm } from '../components/objectives/ObjectiveForm'
+import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
 import { PageHeader } from '../components/cadence/PageHeader'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { StatusChip } from '../components/cadence/StatusChip'
@@ -19,7 +20,7 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
 import { fmt, getQuarterWeeks, getCurrentWeekIdx, profileToPerson } from '../lib/cadenceUtils'
-import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
+import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, UnifiedTask } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
 import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
 
@@ -105,7 +106,13 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 
 // ── KR row with inline task list ─────────────────────────────────────────
 
-function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: string; onDelete?: (id: string) => void }) {
+function KrWithTasks({ kr, userId, objTitle, onDelete, onOpenTask }: {
+  kr: CadenceKeyResult
+  userId: string
+  objTitle: string
+  onDelete?: (id: string) => void
+  onOpenTask?: (task: UnifiedTask) => void
+}) {
   const { tasks, addTask, editTask, updateStatus, removeTask } = useKrTasks(kr.id, userId)
   const [people, setPeople] = useState<SlimProfile[]>([])
   const [linkedKpis, setLinkedKpis] = useState<LinkedKpiSummary[]>([])
@@ -257,8 +264,25 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
                   </div>
                 ) : (
                   /* ── Display row ── */
-                  <div className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}>
-                    <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                  <div
+                    className={`cd-kr-task-row${task.status === 'done' ? ' cd-kr-task-done' : ''}`}
+                    style={{ cursor: onOpenTask ? 'pointer' : undefined }}
+                    onClick={() => onOpenTask && onOpenTask({
+                      id: task.id,
+                      source: 'kr',
+                      title: task.title,
+                      description: task.description ?? null,
+                      status: task.status,
+                      due_date: task.due_date,
+                      assignee_id: task.assignee_id,
+                      assignee: task.assignee ?? undefined,
+                      source_label: objTitle ? `${objTitle} · ${kr.title}` : kr.title,
+                      key_result_id: task.key_result_id,
+                    })}
+                  >
+                    <span onClick={e => e.stopPropagation()}>
+                      <TaskCheck status={task.status} onClick={() => cycleStatus(task)} />
+                    </span>
                     {task.assignee && <Avatar person={profileToPerson(task.assignee as any)} size={16} />}
                     <span className="cd-kr-task-title">{task.title}</span>
                     {task.due_date && (
@@ -271,11 +295,11 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
                       </span>
                     )}
                     <button type="button" className="cd-kr-task-del cd-btn-icon"
-                      onClick={() => startEdit(task)} title="Edit task">
+                      onClick={e => { e.stopPropagation(); startEdit(task) }} title="Edit task">
                       <Icon name="pencil" size={11} />
                     </button>
                     <button type="button" className="cd-kr-task-del cd-btn-icon"
-                      onClick={() => removeTask(task.id)} title="Remove task">
+                      onClick={e => { e.stopPropagation(); removeTask(task.id) }} title="Remove task">
                       <Icon name="x" size={11} />
                     </button>
                   </div>
@@ -336,13 +360,14 @@ function KrWithTasks({ kr, userId, onDelete }: { kr: CadenceKeyResult; userId: s
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onDeleteKr }: {
+function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onDeleteKr, onOpenTask }: {
   obj: CadenceObjective
   userId: string
   relevantUnits?: RelevantUnit[]
   onEditObj?: (obj: CadenceObjective) => void
   onDeleteObj?: (id: string) => void
   onDeleteKr?: (objId: string, krId: string) => void
+  onOpenTask?: (task: UnifiedTask) => void
 }) {
   const [expanded, setExpanded] = useState(true)
   // guardrails state hidden while KPIs nav is hidden — restore when KPIs re-enabled:
@@ -445,7 +470,9 @@ function FocusObjBlock({ obj, userId, relevantUnits, onEditObj, onDeleteObj, onD
           key={kr.id}
           kr={kr}
           userId={userId}
+          objTitle={obj.title}
           onDelete={onDeleteKr ? (krId) => onDeleteKr(obj.id, krId) : undefined}
+          onOpenTask={onOpenTask}
         />
       ))}
     </div>
@@ -466,6 +493,7 @@ export function MyFocusPage() {
 
   const [editingObj, setEditingObj] = useState<CadenceObjective | null>(null)
   const [relevantUnitsMap, setRelevantUnitsMap] = useState<Map<string, RelevantUnit[]>>(new Map())
+  const [selectedTask, setSelectedTask] = useState<UnifiedTask | null>(null)
 
   useEffect(() => {
     if (objectives.length === 0) return
@@ -540,6 +568,7 @@ export function MyFocusPage() {
               onEditObj={setEditingObj}
               onDeleteObj={handleDeleteObj}
               onDeleteKr={handleDeleteKr}
+              onOpenTask={setSelectedTask}
             />
           ))
         )}
@@ -551,6 +580,16 @@ export function MyFocusPage() {
         onSubmit={handleUpdateObj}
         objective={editingObj as unknown as Objective}
       />
+
+      {selectedTask && (
+        <TaskDetailPanel
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onTaskUpdate={fields => {
+            setSelectedTask(prev => prev ? { ...prev, ...fields } : prev)
+          }}
+        />
+      )}
     </div>
   )
 }
