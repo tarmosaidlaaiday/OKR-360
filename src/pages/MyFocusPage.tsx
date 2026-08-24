@@ -20,7 +20,7 @@ import { Avatar } from '../components/cadence/Avatar'
 import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
-import { fmt, getQuarterWeeks, getCurrentWeekIdx, profileToPerson } from '../lib/cadenceUtils'
+import { fmt, getCurrentWeekIdx, profileToPerson } from '../lib/cadenceUtils'
 import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, UnifiedTask } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
 import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
@@ -107,11 +107,10 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 
 // ── KR row with inline task list ─────────────────────────────────────────
 
-function KrWithTasks({ kr, userId, objTitle, weeks, currentWeekIdx, onDelete, onOpenTask }: {
+function KrWithTasks({ kr, userId, objTitle, currentWeekIdx, onDelete, onOpenTask }: {
   kr: CadenceKeyResult
   userId: string
   objTitle: string
-  weeks: number[]
   currentWeekIdx: number
   onDelete?: (id: string) => void
   onOpenTask?: (task: UnifiedTask) => void
@@ -219,11 +218,12 @@ function KrWithTasks({ kr, userId, objTitle, weeks, currentWeekIdx, onDelete, on
           )}
         </div>
         <div className="cd-okr-conf-row">
-          {weeks.map((w, i) => (
-            <span key={w} className="cd-okr-week">
-              <ConfidenceCell value={kr.confidence[i] ?? null} size={18} showNum={false} current={i === currentWeekIdx} />
-            </span>
-          ))}
+          <span className="cd-okr-week">
+            <ConfidenceCell value={currentWeekIdx > 0 ? (kr.confidence[currentWeekIdx - 1] ?? null) : null} size={18} showNum={false} />
+          </span>
+          <span className="cd-okr-week is-current">
+            <ConfidenceCell value={kr.confidence[currentWeekIdx] ?? null} size={18} showNum={false} current />
+          </span>
         </div>
       </div>
 
@@ -369,11 +369,10 @@ function KrWithTasks({ kr, userId, objTitle, weeks, currentWeekIdx, onDelete, on
 
 // ── Objective block ───────────────────────────────────────────────────────
 
-function FocusObjBlock({ obj, userId, relevantUnits, weeks, currentWeekIdx, onEditObj, onDeleteObj, onDeleteKr, onOpenTask }: {
+function FocusObjBlock({ obj, userId, relevantUnits, currentWeekIdx, onEditObj, onDeleteObj, onDeleteKr, onOpenTask }: {
   obj: CadenceObjective
   userId: string
   relevantUnits?: RelevantUnit[]
-  weeks: number[]
   currentWeekIdx: number
   onEditObj?: (obj: CadenceObjective) => void
   onDeleteObj?: (id: string) => void
@@ -482,7 +481,6 @@ function FocusObjBlock({ obj, userId, relevantUnits, weeks, currentWeekIdx, onEd
           kr={kr}
           userId={userId}
           objTitle={obj.title}
-          weeks={weeks}
           currentWeekIdx={currentWeekIdx}
           onDelete={onDeleteKr ? (krId) => onDeleteKr(obj.id, krId) : undefined}
           onOpenTask={onOpenTask}
@@ -538,7 +536,6 @@ export function MyFocusPage() {
     ))
   }
 
-  const weeks = getQuarterWeeks(quarter)
   const currentWeekIdx = getCurrentWeekIdx(quarter)
 
   if (loading) return <div className="cd-page"><p className="cd-loading">Loading…</p></div>
@@ -561,9 +558,8 @@ export function MyFocusPage() {
           <span className="cd-okr-col-status">Status</span>
           <span className="cd-okr-col-progress">Progress</span>
           <div className="cd-okr-conf-header">
-            {weeks.map((w, i) => (
-              <span key={w} className={'cd-okr-week' + (i === currentWeekIdx ? ' is-current' : '')}>W{w}</span>
-            ))}
+            <span className="cd-okr-week">Last week</span>
+            <span className="cd-okr-week is-current">This week</span>
           </div>
         </div>
 
@@ -578,7 +574,6 @@ export function MyFocusPage() {
               obj={obj}
               userId={profile!.id}
               relevantUnits={relevantUnitsMap.get(obj.id)}
-              weeks={weeks}
               currentWeekIdx={currentWeekIdx}
               onEditObj={setEditingObj}
               onDeleteObj={handleDeleteObj}
