@@ -1711,7 +1711,7 @@ kbd.cd-kbd {
 .cd-1on1-date { font-size: 11px; color: var(--ink-faint); }
 
 /* OKRs table */
-.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
+.cd-okr-table { display: flex; flex-direction: column; border: 1px solid rgba(20, 17, 14, 0.16); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
 .cd-okr-header, .cd-okr-row {
   display: grid;
   grid-template-columns: 1fr 44px 100px 140px auto;
@@ -1884,7 +1884,7 @@ kbd.cd-kbd {
 /* ────────────────────────────────────────────────────────────────────────
    OKR table — extended with level + supports columns
    ──────────────────────────────────────────────────────────────────────── */
-.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
+.cd-okr-table { display: flex; flex-direction: column; border: 1px solid rgba(20, 17, 14, 0.16); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
 .cd-okr-header,
 .cd-okr-row {
   display: grid;
@@ -2346,13 +2346,18 @@ kbd.cd-kbd {
   border-bottom: 1px solid var(--line);
 }
 
-.cd-kr-task-list { display: flex; flex-direction: column; gap: 1px; }
+.cd-kr-task-list {
+  display: flex; flex-direction: column; gap: 1px;
+  border-left: 2px solid rgba(20, 17, 14, 0.08);
+  margin-left: 4px;
+}
 .cd-kr-task-row {
   display: flex; align-items: center; gap: 8px;
   padding: 5px 16px 5px 52px;
   border-radius: 4px;
+  background: rgba(20, 17, 14, 0.03);
 }
-.cd-kr-task-row:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+.cd-kr-task-row:hover { background: rgba(20, 17, 14, 0.06); }
 
 /* Collapsed "Add task" trigger */
 .cd-kr-task-add-btn {
