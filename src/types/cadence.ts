@@ -308,6 +308,7 @@ export interface KrTask {
   id: string
   key_result_id: string
   title: string
+  description?: string | null
   status: KrTaskStatus
   due_date: string | null
   assignee_id: string | null
@@ -322,6 +323,7 @@ export interface PersonalTask {
   id: string
   org_id: string
   title: string
+  description?: string | null
   status: KrTaskStatus
   assignee_id: string | null
   assignee?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
@@ -337,6 +339,7 @@ export interface UnifiedTask {
   id: string
   source: 'kr' | 'personal'
   title: string
+  description?: string | null
   status: KrTaskStatus
   due_date: string | null
   assignee_id: string | null

@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
 import type { Comment } from '../types'
 
-const SELECT = 'id, org_id, author_id, objective_id, key_result_id, kpi_id, body, created_at, updated_at, author:profiles(full_name, avatar_url)'
+const SELECT = 'id, org_id, author_id, objective_id, key_result_id, kpi_id, kr_task_id, personal_task_id, body, created_at, updated_at, author:profiles(full_name, avatar_url)'
 
 export const commentsService = {
   async getByObjective(objectiveId: string): Promise<Comment[]> {
@@ -24,6 +24,26 @@ export const commentsService = {
     return (data ?? []) as unknown as Comment[]
   },
 
+  async getByKrTask(krTaskId: string): Promise<Comment[]> {
+    const { data, error } = await supabase
+      .from('comments')
+      .select(SELECT)
+      .eq('kr_task_id', krTaskId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return (data ?? []) as unknown as Comment[]
+  },
+
+  async getByPersonalTask(personalTaskId: string): Promise<Comment[]> {
+    const { data, error } = await supabase
+      .from('comments')
+      .select(SELECT)
+      .eq('personal_task_id', personalTaskId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return (data ?? []) as unknown as Comment[]
+  },
+
   async getByKPI(kpiId: string): Promise<Comment[]> {
     const { data, error } = await supabase
       .from('comments')
@@ -39,6 +59,8 @@ export const commentsService = {
     objective_id?: string
     key_result_id?: string
     kpi_id?: string
+    kr_task_id?: string
+    personal_task_id?: string
     author_id: string
   }): Promise<Comment> {
     const { data, error } = await supabase

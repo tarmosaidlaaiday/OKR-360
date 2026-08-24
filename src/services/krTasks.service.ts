@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import type { KrTask, KrTaskStatus } from '../types/cadence'
 
 const SELECT = `
-  id, key_result_id, title, status, due_date, assignee_id, created_by, created_at,
+  id, key_result_id, title, description, status, due_date, assignee_id, created_by, created_at,
   assignee:profiles!assignee_id(id, full_name, avatar_url, color)
 `
 
@@ -60,7 +60,7 @@ export async function createKrTask(
 
 export async function updateKrTask(
   taskId: string,
-  fields: Partial<Pick<KrTask, 'title' | 'assignee_id' | 'due_date'>>,
+  fields: Partial<Pick<KrTask, 'title' | 'description' | 'assignee_id' | 'due_date'>>,
 ): Promise<void> {
   const { error } = await supabase
     .from('kr_tasks')

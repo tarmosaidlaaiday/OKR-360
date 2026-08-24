@@ -11,7 +11,7 @@ function normaliseAssignee(row: any) {
 }
 
 const PERSONAL_SELECT = `
-  id, org_id, title, status, due_date, assignee_id, created_by,
+  id, org_id, title, description, status, due_date, assignee_id, created_by,
   one_on_one_id, created_at, updated_at,
   assignee:profiles!assignee_id(id, full_name, avatar_url, color)
 `
@@ -45,6 +45,17 @@ export async function createPersonalTask(task: {
   return normaliseAssignee(data) as unknown as PersonalTask
 }
 
+export async function updatePersonalTask(
+  id: string,
+  fields: Partial<Pick<PersonalTask, 'title' | 'description' | 'status' | 'due_date' | 'assignee_id'>>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('personal_tasks')
+    .update({ ...fields, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
 export async function updatePersonalTaskStatus(id: string, status: KrTaskStatus): Promise<void> {
   const { error } = await supabase
     .from('personal_tasks')
@@ -70,7 +81,7 @@ export async function getMyAllTasks(userId: string): Promise<UnifiedTask[]> {
     supabase
       .from('personal_tasks')
       .select(`
-        id, title, status, due_date, assignee_id, one_on_one_id,
+        id, title, description, status, due_date, assignee_id, one_on_one_id,
         assignee:profiles!assignee_id(id, full_name, avatar_url, color),
         one_on_one:one_on_ones!one_on_one_id(
           id, scheduled_at, manager_id, report_id,
@@ -83,7 +94,7 @@ export async function getMyAllTasks(userId: string): Promise<UnifiedTask[]> {
     supabase
       .from('kr_tasks')
       .select(`
-        id, title, status, due_date, assignee_id, key_result_id,
+        id, title, description, status, due_date, assignee_id, key_result_id,
         assignee:profiles!assignee_id(id, full_name, avatar_url, color),
         key_result:key_results!key_result_id(
           id, title,
@@ -116,6 +127,7 @@ export async function getMyAllTasks(userId: string): Promise<UnifiedTask[]> {
       id: row.id,
       source: 'personal' as const,
       title: row.title,
+      description: row.description ?? null,
       status: row.status as KrTaskStatus,
       due_date: row.due_date ?? null,
       assignee_id: row.assignee_id,
@@ -140,6 +152,7 @@ export async function getMyAllTasks(userId: string): Promise<UnifiedTask[]> {
       id: row.id,
       source: 'kr' as const,
       title: row.title,
+      description: row.description ?? null,
       status: row.status as KrTaskStatus,
       due_date: row.due_date ?? null,
       assignee_id: row.assignee_id,
