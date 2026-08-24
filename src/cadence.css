@@ -636,7 +636,7 @@ kbd.cd-kbd {
 .cd-obj-kr-tgt { color: var(--ink-faint); }
 
 /* Meeting card */
-.cd-meeting { display: flex; flex-direction: column; gap: 20px; padding-top: 4px; }
+.cd-meeting { display: flex; flex-direction: column; gap: 20px; padding: 4px var(--d-pad-card) var(--d-pad-card); }
 .cd-meeting-hd { display: flex; align-items: center; gap: 20px; }
 .cd-meeting-name { font-weight: 600; font-size: 15px; }
 .cd-meeting-meta { font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
@@ -1711,7 +1711,7 @@ kbd.cd-kbd {
 .cd-1on1-date { font-size: 11px; color: var(--ink-faint); }
 
 /* OKRs table */
-.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); }
+.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
 .cd-okr-header, .cd-okr-row {
   display: grid;
   grid-template-columns: 1fr 44px 100px 140px auto;
@@ -1884,7 +1884,7 @@ kbd.cd-kbd {
 /* ────────────────────────────────────────────────────────────────────────
    OKR table — extended with level + supports columns
    ──────────────────────────────────────────────────────────────────────── */
-.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); }
+.cd-okr-table { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elev); box-shadow: var(--shadow-card); }
 .cd-okr-header,
 .cd-okr-row {
   display: grid;

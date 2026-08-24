@@ -58,7 +58,9 @@ function TaskRow({ task, onStatusChange, onOpen }: {
       style={{ cursor: 'pointer' }}
       onClick={() => onOpen(task)}
     >
-      <TaskCheck status={task.status} onClick={e => { e.stopPropagation(); cycleStatus() }} />
+      <span onClick={e => e.stopPropagation()}>
+        <TaskCheck status={task.status} onClick={cycleStatus} />
+      </span>
       {task.assignee && (
         <Avatar
           person={{
