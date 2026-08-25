@@ -168,7 +168,8 @@ export async function createDraftSession(
       .single()
 
     if (managerProfile?.org_id) {
-      const dueDate = scheduledAt.slice(0, 10) // YYYY-MM-DD
+      // Due the day before the meeting so prep arrives before the session
+      const dueDate = new Date(new Date(scheduledAt).getTime() - 86400000).toISOString().slice(0, 10)
       const dateLabel = new Date(scheduledAt).toLocaleDateString('en-GB', {
         day: 'numeric', month: 'short',
       })
