@@ -8,7 +8,6 @@ export function useWeeklyCheckin() {
   const { user } = useAuth()
 
   const [krs, setKrs] = useState<CheckinKR[]>([])
-  const [checkinCycleId, setCheckinCycleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [streak, setStreak] = useState<CheckinStreak | null>(null)
   const [drafts, setDrafts] = useState<Map<string, CheckinDraft>>(new Map())
@@ -25,9 +24,8 @@ export function useWeeklyCheckin() {
     Promise.all([
       getMyKRsForCheckin(user.id),
       getMyStreak(user.id),
-    ]).then(([{ krs: fetchedKrs, cycleId }, fetchedStreak]) => {
+    ]).then(([fetchedKrs, fetchedStreak]) => {
       setKrs(fetchedKrs)
-      setCheckinCycleId(cycleId)
       setStreak(fetchedStreak)
 
       // Pre-fill drafts from this week's existing check-ins
@@ -69,7 +67,7 @@ export function useWeeklyCheckin() {
   }, [])
 
   const submitAll = useCallback(async (): Promise<boolean> => {
-    if (!user?.id || !checkinCycleId) return false
+    if (!user?.id) return false
     setIsSubmitting(true)
     setError(null)
 
@@ -82,7 +80,7 @@ export function useWeeklyCheckin() {
           person_id:     user.id,
           week_number:   week,
           year,
-          cycle_id:      checkinCycleId,
+          cycle_id:      kr.cycle_id,
           new_value:     draft.new_value,
           confidence:    draft.confidence || 5,
           will_score:    draft.will_score || null,
@@ -102,7 +100,7 @@ export function useWeeklyCheckin() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [krs, drafts, user?.id, checkinCycleId, week, year])
+  }, [krs, drafts, user?.id, week, year])
 
   // A check-in is "due" if there are KRs and not all have been submitted this week
   const isCheckInDue = krs.length > 0 && !isDone

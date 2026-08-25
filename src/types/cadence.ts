@@ -228,6 +228,7 @@ export interface WeeklyCheckin {
 export interface CheckinKR extends CadenceKeyResult {
   objective_title: string
   objective_id: string
+  cycle_id: string
   this_week_checkin: WeeklyCheckin | null
   last_week_checkin: WeeklyCheckin | null
 }

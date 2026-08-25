@@ -9,50 +9,56 @@ function currentWeekYear(): { week: number; year: number } {
   return { week: getISOWeek(now), year: now.getFullYear() }
 }
 
-// ── Active cycle for check-in (date-derived, ignores global selector) ────
+// ── Active cycles for check-in (date-derived, ignores global selector) ───
 
-// Returns the most granular cycle that is active today for the caller's org.
-// Preference order: quarter > half > year (so weekly check-ins are always
-// scoped to the most specific tracking period, not the browsing selector).
-const PERIOD_RANK: Record<string, number> = { quarter: 0, half: 1, year: 2 }
-
-async function getCheckinCycle(): Promise<{ id: string; period_type: string } | null> {
+// Returns ALL cycle IDs that are active for today's date. Multiple cycles
+// can be simultaneously active at different granularities (Year, Half,
+// Quarter). Using the full set means check-in works regardless of which
+// specific granularity an objective happens to be tagged to.
+async function getActiveCycleIds(): Promise<string[]> {
   const today = new Date().toISOString().split('T')[0]
   const { data, error } = await supabase
     .from('cycles')
-    .select('id, period_type')
+    .select('id')
     .eq('status', 'active')
     .lte('start_date', today)
     .gte('end_date', today)
   if (error) throw error
-  if (!data || data.length === 0) return null
-  const sorted = [...data].sort(
-    (a, b) => (PERIOD_RANK[a.period_type] ?? 9) - (PERIOD_RANK[b.period_type] ?? 9),
-  )
-  return sorted[0] as { id: string; period_type: string }
+  return (data ?? []).map((c: any) => c.id as string)
 }
 
 // ── KRs for stepper ───────────────────────────────────────────────────────
 
-export async function getMyKRsForCheckin(
-  userId: string,
-): Promise<{ krs: CheckinKR[]; cycleId: string | null }> {
-  const cycle = await getCheckinCycle()
-  if (!cycle) return { krs: [], cycleId: null }
+export async function getMyKRsForCheckin(userId: string): Promise<CheckinKR[]> {
+  const activeCycleIds = await getActiveCycleIds()
+  if (activeCycleIds.length === 0) return []
 
   const { week, year } = currentWeekYear()
   const prevWeek = week === 1 ? 52 : week - 1
   const prevYear = week === 1 ? year - 1 : year
 
-  const { data, error } = await supabase
+  // Step 1: objectives owned by this user in any currently-active cycle
+  const { data: objData, error: objError } = await supabase
+    .from('objectives')
+    .select('id, title, cycle_id')
+    .eq('owner_id', userId)
+    .in('cycle_id', activeCycleIds)
+  if (objError) throw objError
+  if (!objData || objData.length === 0) return []
+
+  const objIds = (objData as any[]).map((o: any) => o.id as string)
+  const objMap = new Map((objData as any[]).map((o: any) => [o.id, o]))
+
+  // Step 2: KRs for those objectives where the user owns the KR directly
+  // OR the KR has no explicit owner (ownership falls back to the objective owner).
+  // Previously filtering by kr.owner_id = userId missed all KRs with owner_id = NULL,
+  // which is the normal state when KRs are not individually assigned.
+  const { data: krData, error: krError } = await supabase
     .from('key_results')
     .select(`
       id, objective_id, title, target_type, start_value, target_value,
       current_value, unit, owner_id, confidence,
       owner:profiles!owner_id(id, full_name, avatar_url, color, role),
-      objective:objectives!objective_id(
-        id, title, cycle_id
-      ),
       this_week:checkins(
         id, key_result_id, person_id, week_number, year, cycle_id,
         new_value, confidence, has_blocker, blocker_text, note, submitted_at
@@ -62,16 +68,15 @@ export async function getMyKRsForCheckin(
         new_value, confidence, has_blocker, blocker_text, note, submitted_at
       )
     `)
-    .eq('owner_id', userId)
+    .in('objective_id', objIds)
+    .or(`owner_id.eq.${userId},owner_id.is.null`)
+  if (krError) throw krError
 
-  if (error) throw error
-
-  // Filter by the date-derived cycle (not the global browsing selector)
   const krs: CheckinKR[] = []
 
-  for (const kr of (data ?? []) as any[]) {
-    const obj = kr.objective
-    if (!obj || obj.cycle_id !== cycle.id) continue
+  for (const kr of (krData ?? []) as any[]) {
+    const obj = objMap.get(kr.objective_id)
+    if (!obj) continue
 
     const thisWeek = ((kr.this_week ?? []) as any[]).find(
       (c: any) => c.week_number === week && c.year === year && c.person_id === userId,
@@ -85,6 +90,7 @@ export async function getMyKRsForCheckin(
       id: kr.id,
       objective_id: obj.id,
       objective_title: obj.title,
+      cycle_id: obj.cycle_id,
       title: kr.title,
       owner_id: kr.owner_id,
       owner: kr.owner ?? null,
@@ -92,13 +98,13 @@ export async function getMyKRsForCheckin(
       target_value: kr.target_value,
       unit: kr.unit,
       target_type: kr.target_type,
-      confidence: Array(13).fill(null),  // full trend not needed here
+      confidence: Array(13).fill(null),
       this_week_checkin: thisWeek,
       last_week_checkin: lastWeek,
     } as CheckinKR)
   }
 
-  return { krs, cycleId: cycle.id }
+  return krs
 }
 
 // ── Submit a single KR check-in ───────────────────────────────────────────
