@@ -1183,6 +1183,65 @@ kbd.cd-kbd {
   grid-template-columns: 280px 1fr;
   gap: var(--d-gap-grid);
 }
+.cd-oo-layout--with-activity {
+  grid-template-columns: 280px 1fr 260px;
+}
+.cd-oo-act-rail {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  align-self: start;
+  position: sticky;
+  top: calc(var(--top-h) + 16px);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--top-h) - 48px);
+  overflow: hidden;
+}
+.cd-oo-act-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-mid);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.cd-oo-act-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px 0;
+}
+.cd-oo-act-entry {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  padding: 8px 14px;
+  align-items: start;
+}
+.cd-oo-act-entry + .cd-oo-act-entry {
+  border-top: 1px solid var(--line);
+}
+.cd-oo-act-desc {
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.45;
+}
+.cd-oo-act-time {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+.cd-oo-act-empty {
+  padding: 20px 14px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  text-align: center;
+}
 .cd-oo-side {
   background: var(--bg-elev);
   border: 1px solid var(--line);

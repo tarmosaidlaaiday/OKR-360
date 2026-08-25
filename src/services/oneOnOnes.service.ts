@@ -362,6 +362,39 @@ export async function updateSchedule(oneOnOneId: string, isoString: string): Pro
   if (error) throw error
 }
 
+// ── Activity log ──────────────────────────────────────────────────────────
+
+export interface ActivityEntry {
+  id: string
+  one_on_one_id: string
+  actor_id: string
+  actor: { id: string; full_name: string; avatar_url: string | null; color: string | null }
+  description: string
+  created_at: string
+}
+
+export async function logActivity(
+  oneOnOneId: string,
+  actorId: string,
+  description: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('one_on_one_activity')
+    .insert({ one_on_one_id: oneOnOneId, actor_id: actorId, description })
+  if (error) throw error
+}
+
+export async function getActivityFeed(oneOnOneId: string): Promise<ActivityEntry[]> {
+  const { data, error } = await supabase
+    .from('one_on_one_activity')
+    .select('id, one_on_one_id, actor_id, description, created_at, actor:profiles!actor_id(id, full_name, avatar_url, color)')
+    .eq('one_on_one_id', oneOnOneId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  return (data ?? []) as unknown as ActivityEntry[]
+}
+
 // ── Legacy helpers kept for backward compat ────────────────────────────────
 
 export async function getOneOnOnes(userId: string): Promise<OneOnOne[]> {

@@ -14,7 +14,9 @@ import { supabase } from '../lib/supabase'
 import { getErrorMessage } from '../lib/errors'
 import {
   createDraftSession, duplicateSession, deleteSession, updateSchedule,
+  logActivity, getActivityFeed,
 } from '../services/oneOnOnes.service'
+import type { ActivityEntry } from '../services/oneOnOnes.service'
 import { getMyAllTasks, createPersonalTask, updatePersonalTaskStatus } from '../services/personalTasks.service'
 import { updateKrTaskStatus } from '../services/krTasks.service'
 import { EmptyState } from '../components/cadence/EmptyState'
@@ -123,6 +125,61 @@ function KebabMenu({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Activity feed helpers ──────────────────────────────────────────────────
+
+function timeAgo(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function ActivityFeed({ oneOnOneId, refreshKey, onClose }: {
+  oneOnOneId: string
+  refreshKey: number
+  onClose: () => void
+}) {
+  const [entries, setEntries] = useState<ActivityEntry[]>([])
+
+  useEffect(() => {
+    getActivityFeed(oneOnOneId)
+      .then(setEntries)
+      .catch(err => console.error('[1:1 activity] fetch failed', err))
+  }, [oneOnOneId, refreshKey])
+
+  return (
+    <div className="cd-oo-act-rail">
+      <div className="cd-oo-act-hd">
+        Activity
+        <button type="button" className="cd-btn-icon" onClick={onClose} style={{ width: 22, height: 22 }} aria-label="Close">
+          <Icon name="x" size={12} />
+        </button>
+      </div>
+      <div className="cd-oo-act-list">
+        {entries.length === 0 && (
+          <div className="cd-oo-act-empty">No activity yet</div>
+        )}
+        {entries.map(e => (
+          <div key={e.id} className="cd-oo-act-entry">
+            <Avatar
+              person={{ id: e.actor.id, name: e.actor.full_name, initials: e.actor.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), color: e.actor.color ?? '#888', avatar_url: e.actor.avatar_url, role: '' }}
+              size={22}
+            />
+            <div>
+              <div className="cd-oo-act-desc">{e.description}</div>
+              <div className="cd-oo-act-time">{timeAgo(e.created_at)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -350,12 +407,13 @@ function TaskCheck({ status, onClick }: { status: KrTaskStatus; onClick: () => v
 // ── Tasks tab ─────────────────────────────────────────────────────────────
 
 function TasksAgenda({
-  person, currentUserId, orgId, oneOnOneId,
+  person, currentUserId, orgId, oneOnOneId, onActivity,
 }: {
   person: Person
   currentUserId: string
   orgId: string
   oneOnOneId: string | null
+  onActivity: (description: string) => void
 }) {
   const [tasks, setTasks] = useState<UnifiedTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -381,6 +439,9 @@ function TasksAgenda({
         await updateKrTaskStatus(id, nextStatus)
       } else {
         await updatePersonalTaskStatus(id, nextStatus)
+      }
+      if (nextStatus === 'done') {
+        onActivity(`Completed task: "${task.title}"`)
       }
     } catch (e) {
       setTasks(prev => prev.map(t => t.id === id ? { ...t, status: task.status } : t))
@@ -413,6 +474,7 @@ function TasksAgenda({
       }
       setTasks(prev => [...prev, newTask])
       setNewTitle('')
+      onActivity(`Added task: "${title}"`)
     } catch (e) {
       setError(getErrorMessage(e))
     } finally {
@@ -532,6 +594,36 @@ export function OneOnOnesPage() {
   const [savedEntry, setSavedEntry] = useState<Partial<OneOnOneEntry>>({})  // snapshot for Cancel
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [activityKey, setActivityKey] = useState(0)
+
+  const tabRef = useRef<TabId>('personal')
+  tabRef.current = tab
+  const userIdRef = useRef<string | undefined>(undefined)
+  userIdRef.current = user?.id
+  const actorNameRef = useRef<string>('Someone')
+  actorNameRef.current = profile?.full_name?.split(' ')[0] ?? 'Someone'
+
+  const SECTION_LABELS: Partial<Record<TabId, string>> = {
+    personal: 'Personal catch-up',
+    work: 'Work notes',
+    feedback: 'Feedback',
+  }
+
+  function refreshActivity() {
+    setActivityKey(k => k + 1)
+  }
+
+  async function fireLog(oneOnOneId: string, description: string) {
+    const actorId = userIdRef.current
+    if (!actorId) return
+    try {
+      await logActivity(oneOnOneId, actorId, description)
+      refreshActivity()
+    } catch (err) {
+      console.error('[1:1 activity] log failed (non-fatal)', err)
+    }
+  }
 
   // New 1:1 person picker
   const { newMeetingOpen, setNewMeetingOpen } = usePageActionStore()
@@ -625,13 +717,24 @@ export function OneOnOnesPage() {
         await saveEntry(id, fields)
       }
       setLastSaved(new Date())
+      // Log section save (best-effort, non-blocking)
+      const sectionLabel = SECTION_LABELS[tabRef.current]
+      if (sectionLabel) {
+        void fireLog(id, `${actorNameRef.current} updated ${sectionLabel}`)
+      }
     }, 800)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveEntry, updateSession])
 
   async function handleSubmit() {
     if (!draft) return
     setSubmitting(true)
-    try { await submitDraft() } finally { setSubmitting(false) }
+    try {
+      await submitDraft()
+      void fireLog(draft.id, `${actorNameRef.current} submitted their prep`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function handleSavePast() {
@@ -731,7 +834,7 @@ export function OneOnOnesPage() {
         </div>
       </header>
 
-      <div className="cd-oo-layout">
+      <div className={'cd-oo-layout' + (activityOpen && openSessionId ? ' cd-oo-layout--with-activity' : '')}>
         {/* Left sidebar */}
         <aside className="cd-oo-side">
           <div className="cd-oo-side-hd">People</div>
@@ -823,7 +926,7 @@ export function OneOnOnesPage() {
           )}
         </aside>
 
-        {/* Main panel */}
+        {/* Main panel — flex-col so the card fills height */}
         <main className="cd-oo-main">
           {selectedPerson ? (
             <div className="cd-card" style={{ padding: 0 }}>
@@ -866,6 +969,15 @@ export function OneOnOnesPage() {
                   <div className="cd-oo-mhd-trend-lbl">Happiness · last {Math.min(4, pastHappiness.length)} weeks</div>
                   <HappinessTrackRow values={pastHappiness} />
                 </div>
+                <button
+                  type="button"
+                  className={'cd-btn cd-btn-ghost cd-btn-sm ' + (activityOpen ? 'is-on' : '')}
+                  onClick={() => setActivityOpen(v => !v)}
+                  title="Toggle activity feed"
+                  style={{ alignSelf: 'flex-start', marginLeft: 'auto' }}
+                >
+                  <Icon name="history" size={13} /> Activity
+                </button>
               </div>
 
               {/* Tabs */}
@@ -920,6 +1032,7 @@ export function OneOnOnesPage() {
                   currentUserId={user?.id ?? ''}
                   orgId={profile?.org_id ?? ''}
                   oneOnOneId={openSessionId}
+                  onActivity={desc => openSessionId && void fireLog(openSessionId, `${actorNameRef.current} — ${desc}`)}
                 />
               )}
 
@@ -973,6 +1086,15 @@ export function OneOnOnesPage() {
             </div>
           )}
         </main>
+
+        {/* Activity feed rail — third grid column */}
+        {activityOpen && openSessionId && (
+          <ActivityFeed
+            oneOnOneId={openSessionId}
+            refreshKey={activityKey}
+            onClose={() => setActivityOpen(false)}
+          />
+        )}
       </div>
 
       {/* Delete confirm modal */}
