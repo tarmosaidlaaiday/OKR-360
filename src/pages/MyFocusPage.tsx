@@ -209,7 +209,10 @@ function KrWithTasks({ kr, userId, objTitle, currentWeekIdx, onDelete, onOpenTas
           {kr.target_type !== 'boolean' ? (
             <>
               <ProgressBar value={Math.min(1, kr.current_value / (kr.target_value || 1))} height={4} />
-              <span className="cd-okr-pct">
+              <span
+                className="cd-okr-pct"
+                title={`${fmt(kr.current_value)}${kr.unit ?? ''} / ${fmt(kr.target_value)}${kr.unit ?? ''}`}
+              >
                 {fmt(kr.current_value)}{kr.unit ?? ''} / {fmt(kr.target_value)}{kr.unit ?? ''}
               </span>
             </>
