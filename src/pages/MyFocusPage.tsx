@@ -467,13 +467,20 @@ function FocusObjBlock({ obj, userId, relevantUnits, currentWeekIdx, onEditObj, 
       )}
       */}
 
-      {/* Relevant-to units */}
-      {relevantUnits && relevantUnits.length > 0 && (
+      {/* Cycle label + relevant-to units */}
+      {(obj.cycle?.label || (relevantUnits && relevantUnits.length > 0)) && (
         <div className="cd-rel-units-row">
-          <span className="cd-rel-units-label">Relevant to</span>
-          {relevantUnits.map(ru => (
-            <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
-          ))}
+          {obj.cycle?.label && (
+            <span className="cd-cycle-pill">{obj.cycle.label}</span>
+          )}
+          {relevantUnits && relevantUnits.length > 0 && (
+            <>
+              <span className="cd-rel-units-label">Relevant to</span>
+              {relevantUnits.map(ru => (
+                <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
+              ))}
+            </>
+          )}
         </div>
       )}
 

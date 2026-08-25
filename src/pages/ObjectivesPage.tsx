@@ -113,12 +113,19 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
           <ConfidenceTrend values={obj.confidence} currentIdx={currentWeekIdx} weeks={weeks} size={20} />
         </div>
       </div>
-      {relevantUnits && relevantUnits.length > 0 && (
+      {(obj.cycle?.label || (relevantUnits && relevantUnits.length > 0)) && (
         <div className="cd-rel-units-row">
-          <span className="cd-rel-units-label">Relevant to</span>
-          {relevantUnits.map(ru => (
-            <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
-          ))}
+          {obj.cycle?.label && (
+            <span className="cd-cycle-pill">{obj.cycle.label}</span>
+          )}
+          {relevantUnits && relevantUnits.length > 0 && (
+            <>
+              <span className="cd-rel-units-label">Relevant to</span>
+              {relevantUnits.map(ru => (
+                <span key={ru.id} className="cd-rel-unit-pill">{ru.unit.name}</span>
+              ))}
+            </>
+          )}
         </div>
       )}
     </>

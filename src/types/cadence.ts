@@ -81,6 +81,7 @@ export interface CadenceObjective {
   unit_id: string | null
   unit?: { id: string; name: string } | null
   cycle_id: string
+  cycle?: { id: string; label: string } | null
   status: string
   // Cascade fields
   level_id: string | null
