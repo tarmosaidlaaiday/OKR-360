@@ -1,15 +1,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getErrorMessage } from '../lib/errors'
-import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { getMyKRsForCheckin, submitCheckin, getMyStreak, currentWeekYear } from '../services/weeklyCheckins.service'
 import type { CheckinKR, CheckinDraft, CheckinStreak } from '../types/cadence'
 
 export function useWeeklyCheckin() {
-  const { activeCycle } = useCycle()
   const { user } = useAuth()
 
   const [krs, setKrs] = useState<CheckinKR[]>([])
+  const [checkinCycleId, setCheckinCycleId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [streak, setStreak] = useState<CheckinStreak | null>(null)
   const [drafts, setDrafts] = useState<Map<string, CheckinDraft>>(new Map())
@@ -20,14 +19,15 @@ export function useWeeklyCheckin() {
   const { week, year } = currentWeekYear()
 
   useEffect(() => {
-    if (!activeCycle?.id || !user?.id) { setLoading(false); return }
+    if (!user?.id) { setLoading(false); return }
     setLoading(true)
 
     Promise.all([
-      getMyKRsForCheckin(user.id, activeCycle.id),
+      getMyKRsForCheckin(user.id),
       getMyStreak(user.id),
-    ]).then(([fetchedKrs, fetchedStreak]) => {
+    ]).then(([{ krs: fetchedKrs, cycleId }, fetchedStreak]) => {
       setKrs(fetchedKrs)
+      setCheckinCycleId(cycleId)
       setStreak(fetchedStreak)
 
       // Pre-fill drafts from this week's existing check-ins
@@ -55,7 +55,7 @@ export function useWeeklyCheckin() {
     }).finally(() => {
       setLoading(false)
     })
-  }, [activeCycle?.id, user?.id])
+  }, [user?.id])
 
   const setDraft = useCallback((krId: string, draft: Partial<CheckinDraft>) => {
     setDrafts(prev => {
@@ -69,7 +69,7 @@ export function useWeeklyCheckin() {
   }, [])
 
   const submitAll = useCallback(async (): Promise<boolean> => {
-    if (!user?.id || !activeCycle?.id) return false
+    if (!user?.id || !checkinCycleId) return false
     setIsSubmitting(true)
     setError(null)
 
@@ -82,7 +82,7 @@ export function useWeeklyCheckin() {
           person_id:     user.id,
           week_number:   week,
           year,
-          cycle_id:      activeCycle.id,
+          cycle_id:      checkinCycleId,
           new_value:     draft.new_value,
           confidence:    draft.confidence || 5,
           will_score:    draft.will_score || null,
@@ -102,7 +102,7 @@ export function useWeeklyCheckin() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [krs, drafts, user?.id, activeCycle?.id, week, year])
+  }, [krs, drafts, user?.id, checkinCycleId, week, year])
 
   // A check-in is "due" if there are KRs and not all have been submitted this week
   const isCheckInDue = krs.length > 0 && !isDone

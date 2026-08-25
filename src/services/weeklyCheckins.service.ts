@@ -9,12 +9,37 @@ function currentWeekYear(): { week: number; year: number } {
   return { week: getISOWeek(now), year: now.getFullYear() }
 }
 
+// ── Active cycle for check-in (date-derived, ignores global selector) ────
+
+// Returns the most granular cycle that is active today for the caller's org.
+// Preference order: quarter > half > year (so weekly check-ins are always
+// scoped to the most specific tracking period, not the browsing selector).
+const PERIOD_RANK: Record<string, number> = { quarter: 0, half: 1, year: 2 }
+
+async function getCheckinCycle(): Promise<{ id: string; period_type: string } | null> {
+  const today = new Date().toISOString().split('T')[0]
+  const { data, error } = await supabase
+    .from('cycles')
+    .select('id, period_type')
+    .eq('status', 'active')
+    .lte('start_date', today)
+    .gte('end_date', today)
+  if (error) throw error
+  if (!data || data.length === 0) return null
+  const sorted = [...data].sort(
+    (a, b) => (PERIOD_RANK[a.period_type] ?? 9) - (PERIOD_RANK[b.period_type] ?? 9),
+  )
+  return sorted[0] as { id: string; period_type: string }
+}
+
 // ── KRs for stepper ───────────────────────────────────────────────────────
 
 export async function getMyKRsForCheckin(
   userId: string,
-  cycleId: string,
-): Promise<CheckinKR[]> {
+): Promise<{ krs: CheckinKR[]; cycleId: string | null }> {
+  const cycle = await getCheckinCycle()
+  if (!cycle) return { krs: [], cycleId: null }
+
   const { week, year } = currentWeekYear()
   const prevWeek = week === 1 ? 52 : week - 1
   const prevYear = week === 1 ? year - 1 : year
@@ -41,12 +66,12 @@ export async function getMyKRsForCheckin(
 
   if (error) throw error
 
-  // Filter by cycle and reshape
+  // Filter by the date-derived cycle (not the global browsing selector)
   const krs: CheckinKR[] = []
 
   for (const kr of (data ?? []) as any[]) {
     const obj = kr.objective
-    if (!obj || obj.cycle_id !== cycleId) continue
+    if (!obj || obj.cycle_id !== cycle.id) continue
 
     const thisWeek = ((kr.this_week ?? []) as any[]).find(
       (c: any) => c.week_number === week && c.year === year && c.person_id === userId,
@@ -73,7 +98,7 @@ export async function getMyKRsForCheckin(
     } as CheckinKR)
   }
 
-  return krs
+  return { krs, cycleId: cycle.id }
 }
 
 // ── Submit a single KR check-in ───────────────────────────────────────────
