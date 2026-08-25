@@ -115,7 +115,8 @@ export async function getSessionsForPair(
         personal_low, professional_low,
         work_wins, work_blockers, work_needs_manager, work_topics,
         feedback_for_report, feedback_from_report,
-        happiness, happiness_followup, submitted_at, last_saved_at
+        happiness, happiness_followup, submitted_at,
+        employee_submitted_at, manager_submitted_at, last_saved_at
       )
     `)
     .or(
@@ -216,8 +217,13 @@ export async function submitSession(
   _submitterId: string,
   otherId: string,
   otherName: string,
+  isManager: boolean,
 ): Promise<void> {
   const now = new Date().toISOString()
+
+  // Determine which one_on_ones row this is to confirm the caller's role
+  // (isManager is passed by the caller but we trust the trigger for enforcement)
+  const roleField = isManager ? 'manager_submitted_at' : 'employee_submitted_at'
 
   // Mark session done
   await supabase
@@ -225,7 +231,7 @@ export async function submitSession(
     .update({ status: 'done', done: true })
     .eq('id', oneOnOneId)
 
-  // Mark entry submitted
+  // Mark entry submitted — set the role-specific timestamp and shared submitted_at
   const { data: entry } = await supabase
     .from('one_on_one_entries')
     .select('id')
@@ -234,7 +240,7 @@ export async function submitSession(
   if (entry) {
     await supabase
       .from('one_on_one_entries')
-      .update({ submitted_at: now, last_saved_at: now })
+      .update({ [roleField]: now, submitted_at: now, last_saved_at: now })
       .eq('id', (entry as any).id)
   }
 

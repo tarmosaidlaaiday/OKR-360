@@ -136,9 +136,10 @@ export function useOneOnOnes() {
   const submitDraft = useCallback(async () => {
     if (!draft || !user?.id || !selectedId) return
     const name = profile?.full_name ?? 'Someone'
-    await submitSession(draft.id, user.id, selectedId, name)
+    const callerIsManager = reports.some(r => r.id === selectedId)
+    await submitSession(draft.id, user.id, selectedId, name, callerIsManager)
     await loadSessions(selectedId)
-  }, [draft, user?.id, selectedId, profile, loadSessions])
+  }, [draft, user?.id, selectedId, profile, loadSessions, reports])
 
   // Combine actual session partners (source of truth) with reporting-line
   // fallback. Partners go first so anyone added via the picker is always visible.

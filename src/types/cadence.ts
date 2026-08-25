@@ -153,6 +153,8 @@ export interface OneOnOneEntry {
   happiness: number | null
   happiness_followup: string | null
   submitted_at: string | null
+  employee_submitted_at: string | null
+  manager_submitted_at: string | null
   last_saved_at: string | null
 }
 
