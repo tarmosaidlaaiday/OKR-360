@@ -52,18 +52,20 @@ interface FieldProps {
   onChange: (v: string) => void
   example?: string
   rows?: number
+  readOnly?: boolean
 }
 
-function Field({ label, placeholder, value, onChange, example, rows = 3 }: FieldProps) {
+function Field({ label, placeholder, value, onChange, example, rows = 3, readOnly }: FieldProps) {
   return (
-    <label className="cd-field">
+    <label className={'cd-field' + (readOnly ? ' cd-field--readonly' : '')}>
       <span className="cd-field-lbl">{label}</span>
       <textarea
         className="cd-field-input"
         placeholder={placeholder}
         value={value}
         rows={rows}
-        onChange={e => onChange(e.target.value)}
+        readOnly={readOnly}
+        onChange={readOnly ? undefined : e => onChange(e.target.value)}
       />
       {example && <span className="cd-field-eg">e.g. {example}</span>}
     </label>
@@ -186,14 +188,22 @@ function ActivityFeed({ oneOnOneId, refreshKey, onClose }: {
 
 // ── Personal catch-up tab ─────────────────────────────────────────────────
 
-function PersonalCatchup({ entry, onChange }: {
+function PersonalCatchup({ entry, onChange, isSessionManager }: {
   entry: Partial<OneOnOneEntry>
   onChange: (fields: Partial<OneOnOneEntry>) => void
+  isSessionManager: boolean
 }) {
   const happy = entry.happiness ?? 7
+  const ro = isSessionManager  // manager cannot edit employee fields
 
   return (
     <div className="cd-oo-body">
+      {isSessionManager && (
+        <div className="cd-oo-role-notice">
+          <Icon name="info" size={13} />
+          Employee section — view only for managers
+        </div>
+      )}
       <div className="cd-oo-goal">
         <Icon name="info" size={14} />
         <span><strong>Goal.</strong> Get a real read on the human, then on the work. Two minutes, four prompts.</span>
@@ -205,6 +215,7 @@ function PersonalCatchup({ entry, onChange }: {
           placeholder="A great moment outside work…"
           value={entry.personal_highlight ?? ''}
           onChange={v => onChange({ personal_highlight: v })}
+          readOnly={ro}
         />
         <Field
           label="Professional · highlights"
@@ -212,18 +223,21 @@ function PersonalCatchup({ entry, onChange }: {
           value={entry.professional_highlight ?? ''}
           onChange={v => onChange({ professional_highlight: v })}
           example="Insights beta opened to 5 new teams — best NPS so far."
+          readOnly={ro}
         />
         <Field
           label="Personal · low points"
           placeholder="Anything weighing on you…"
           value={entry.personal_low ?? ''}
           onChange={v => onChange({ personal_low: v })}
+          readOnly={ro}
         />
         <Field
           label="Professional · low points"
           placeholder="A frustration at work…"
           value={entry.professional_low ?? ''}
           onChange={v => onChange({ professional_low: v })}
+          readOnly={ro}
         />
       </div>
 
@@ -239,7 +253,8 @@ function PersonalCatchup({ entry, onChange }: {
                 key={n}
                 type="button"
                 className={'cd-oo-happy-pt ' + (happy === n ? 'is-on' : '')}
-                onClick={() => onChange({ happiness: n })}
+                onClick={ro ? undefined : () => onChange({ happiness: n })}
+                disabled={ro}
                 style={{ '--c': confidenceColor(n) } as React.CSSProperties}
               >
                 {n}
@@ -261,6 +276,7 @@ function PersonalCatchup({ entry, onChange }: {
           placeholder="One specific thing…"
           value={entry.happiness_followup ?? ''}
           onChange={v => onChange({ happiness_followup: v })}
+          readOnly={ro}
         />
       </div>
     </div>
@@ -269,12 +285,20 @@ function PersonalCatchup({ entry, onChange }: {
 
 // ── Work tab ──────────────────────────────────────────────────────────────
 
-function WorkAgenda({ entry, onChange }: {
+function WorkAgenda({ entry, onChange, isSessionManager }: {
   entry: Partial<OneOnOneEntry>
   onChange: (fields: Partial<OneOnOneEntry>) => void
+  isSessionManager: boolean
 }) {
+  const ro = isSessionManager
   return (
     <div className="cd-oo-body">
+      {isSessionManager && (
+        <div className="cd-oo-role-notice">
+          <Icon name="info" size={13} />
+          Employee section — view only for managers
+        </div>
+      )}
       <div className="cd-oo-grid">
         <Field
           label="Wins this week"
@@ -282,24 +306,28 @@ function WorkAgenda({ entry, onChange }: {
           value={entry.work_wins ?? ''}
           onChange={v => onChange({ work_wins: v })}
           example="Cut the dashboard query plan from 3 joins to 1. p95 down 40ms."
+          readOnly={ro}
         />
         <Field
           label="Blockers"
           placeholder="What's in your way?"
           value={entry.work_blockers ?? ''}
           onChange={v => onChange({ work_blockers: v })}
+          readOnly={ro}
         />
         <Field
           label="What I need from my manager"
           placeholder="Help, cover, an intro, a decision…"
           value={entry.work_needs_manager ?? ''}
           onChange={v => onChange({ work_needs_manager: v })}
+          readOnly={ro}
         />
         <Field
           label="Topics to discuss"
           placeholder="Add an item to the agenda…"
           value={entry.work_topics ?? ''}
           onChange={v => onChange({ work_topics: v })}
+          readOnly={ro}
         />
       </div>
     </div>
@@ -361,28 +389,39 @@ function OKRsAgenda({ person, cycleId }: { person: Person; cycleId: string | nul
 
 // ── Feedback tab ──────────────────────────────────────────────────────────
 
-function FeedbackAgenda({ person, entry, onChange }: {
+function FeedbackAgenda({ person, entry, onChange, isSessionManager }: {
   person: Person
   entry: Partial<OneOnOneEntry>
   onChange: (fields: Partial<OneOnOneEntry>) => void
+  isSessionManager: boolean
 }) {
   const firstName = person.name.split(' ')[0]
   return (
     <div className="cd-oo-body">
       <div className="cd-oo-grid">
-        <Field
-          label={`Feedback for ${firstName}`}
-          placeholder="Specific. Recent. Actionable."
-          value={entry.feedback_for_report ?? ''}
-          onChange={v => onChange({ feedback_for_report: v })}
-          example="Liked how you ran the migration kickoff — the rollback plan made everyone calmer."
-        />
-        <Field
-          label={`Feedback from ${firstName}`}
-          placeholder={`What ${firstName} wants you to know`}
-          value={entry.feedback_from_report ?? ''}
-          onChange={v => onChange({ feedback_from_report: v })}
-        />
+        {/* Manager-authored field */}
+        <div>
+          <div className="cd-oo-field-owner">{isSessionManager ? 'Your part' : "Manager's part"}</div>
+          <Field
+            label={`Feedback for ${firstName}`}
+            placeholder="Specific. Recent. Actionable."
+            value={entry.feedback_for_report ?? ''}
+            onChange={v => onChange({ feedback_for_report: v })}
+            example="Liked how you ran the migration kickoff — the rollback plan made everyone calmer."
+            readOnly={!isSessionManager}
+          />
+        </div>
+        {/* Employee-authored field */}
+        <div>
+          <div className="cd-oo-field-owner">{isSessionManager ? "Their part" : 'Your part'}</div>
+          <Field
+            label={`Feedback from ${firstName}`}
+            placeholder={`What ${firstName} wants you to know`}
+            value={entry.feedback_from_report ?? ''}
+            onChange={v => onChange({ feedback_from_report: v })}
+            readOnly={isSessionManager}
+          />
+        </div>
       </div>
     </div>
   )
@@ -643,6 +682,8 @@ export function OneOnOnesPage() {
   const [rescheduling, setRescheduling] = useState(false)
 
   const isViewingPast = openSession?.status === 'done'
+  // Role for the currently-open session — derived from session data, not hook-level isManager
+  const isSessionManager = !!(openSession?.manager_id && openSession.manager_id === user?.id)
 
   // Refs so the debounced callback sees current values without going stale
   const openSessionIdRef = useRef<string | null>(null)
@@ -981,6 +1022,20 @@ export function OneOnOnesPage() {
               </div>
 
               {/* Tabs */}
+              {/* Per-role submission status */}
+              {openSession && (
+                <div className="cd-oo-submit-status">
+                  <div className={'cd-oo-submit-pill ' + (openSession.entry?.employee_submitted_at ? 'is-done' : '')}>
+                    {isSessionManager ? 'Their prep' : 'Your prep'}:
+                    {openSession.entry?.employee_submitted_at ? ' Submitted' : ' Not yet submitted'}
+                  </div>
+                  <div className={'cd-oo-submit-pill ' + (openSession.entry?.manager_submitted_at ? 'is-done' : '')}>
+                    {isSessionManager ? 'Your part' : 'Manager'}:
+                    {openSession.entry?.manager_submitted_at ? ' Submitted' : ' Not yet submitted'}
+                  </div>
+                </div>
+              )}
+
               <div className="cd-oo-tabs">
                 {([
                   { id: 'personal', label: 'Personal catch-up' },
@@ -1005,12 +1060,14 @@ export function OneOnOnesPage() {
                 <PersonalCatchup
                   entry={localEntry}
                   onChange={handleEntryChange}
+                  isSessionManager={isSessionManager}
                 />
               )}
               {tab === 'work' && (
                 <WorkAgenda
                   entry={localEntry}
                   onChange={handleEntryChange}
+                  isSessionManager={isSessionManager}
                 />
               )}
               {tab === 'okrs' && (
@@ -1024,6 +1081,7 @@ export function OneOnOnesPage() {
                   person={selectedPerson}
                   entry={localEntry}
                   onChange={handleEntryChange}
+                  isSessionManager={isSessionManager}
                 />
               )}
               {tab === 'tasks' && (

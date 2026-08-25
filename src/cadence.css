@@ -1242,6 +1242,61 @@ kbd.cd-kbd {
   color: var(--ink-faint);
   text-align: center;
 }
+
+/* ── 1:1 field authorship & submission status ────────────────────────────── */
+
+.cd-field--readonly .cd-field-input {
+  background: color-mix(in oklab, var(--ink) 3%, var(--bg-elev));
+  color: var(--ink-mid);
+  cursor: default;
+  resize: none;
+}
+.cd-field--readonly .cd-field-lbl {
+  color: var(--ink-faint);
+}
+.cd-oo-role-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--ink) 4%, var(--bg-elev));
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.cd-oo-field-owner {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.cd-oo-submit-status {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.cd-oo-submit-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: color-mix(in oklab, var(--ink) 5%, var(--bg-elev));
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+}
+.cd-oo-submit-pill.is-done {
+  background: color-mix(in oklab, var(--ok, #1f7a4d) 10%, var(--bg-elev));
+  color: var(--ok, #1f7a4d);
+  border-color: color-mix(in oklab, var(--ok, #1f7a4d) 25%, transparent);
+}
 .cd-oo-side {
   background: var(--bg-elev);
   border: 1px solid var(--line);
