@@ -296,7 +296,7 @@ function WorkAgenda({ entry, onChange, isSessionManager }: {
       {isSessionManager && (
         <div className="cd-oo-role-notice">
           <Icon name="info" size={13} />
-          Employee section — view only for managers
+          Employee section — view only for managers, except Topics which both can edit
         </div>
       )}
       <div className="cd-oo-grid">
@@ -327,7 +327,6 @@ function WorkAgenda({ entry, onChange, isSessionManager }: {
           placeholder="Add an item to the agenda…"
           value={entry.work_topics ?? ''}
           onChange={v => onChange({ work_topics: v })}
-          readOnly={ro}
         />
       </div>
     </div>
@@ -457,6 +456,7 @@ function TasksAgenda({
   const [tasks, setTasks] = useState<UnifiedTask[]>([])
   const [loading, setLoading] = useState(true)
   const [newTitle, setNewTitle] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -500,6 +500,7 @@ function TasksAgenda({
         assignee_id: person.id,
         created_by: currentUserId,
         one_on_one_id: oneOnOneId,
+        due_date: newDueDate || null,
       })
       const newTask: UnifiedTask = {
         id: created.id,
@@ -513,6 +514,7 @@ function TasksAgenda({
       }
       setTasks(prev => [...prev, newTask])
       setNewTitle('')
+      setNewDueDate('')
       onActivity(`Added task: "${title}"`)
     } catch (e) {
       setError(getErrorMessage(e))
@@ -564,7 +566,7 @@ function TasksAgenda({
 
           {/* Inline add-task form */}
           {oneOnOneId && (
-            <form onSubmit={handleAddTask} className="cd-kr-task-add" style={{ marginTop: 8 }}>
+            <form onSubmit={handleAddTask} className="cd-kr-task-add" style={{ marginTop: 8, flexWrap: 'wrap', gap: 6 }}>
               <span style={{ color: 'var(--ink-faint)', display: 'flex' }}><Icon name="plus" size={12} /></span>
               <input
                 className="cd-kr-task-add-input"
@@ -572,6 +574,16 @@ function TasksAgenda({
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
                 disabled={adding}
+                style={{ flex: 1 }}
+              />
+              <input
+                type="date"
+                className="cd-kr-task-add-input"
+                value={newDueDate}
+                onChange={e => setNewDueDate(e.target.value)}
+                disabled={adding}
+                style={{ flex: '0 0 auto', width: 130 }}
+                title="Due date (optional)"
               />
               <button
                 type="submit"
