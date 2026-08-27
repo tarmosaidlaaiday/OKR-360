@@ -13,7 +13,7 @@ import { CascadePage } from './CascadePage'
 import { MyContributionPage } from './MyContributionPage'
 import { EmptyState } from '../components/cadence/EmptyState'
 import { PageHeader } from '../components/cadence/PageHeader'
-import { ConfidenceTrend } from '../components/cadence/ConfidenceTrend'
+import { ConfidenceCell } from '../components/cadence/ConfidenceCell'
 import { StatusChip } from '../components/cadence/StatusChip'
 import { LevelBadge } from '../components/cadence/LevelBadge'
 import { AlignmentPill } from '../components/cadence/AlignmentPill'
@@ -71,8 +71,8 @@ function DeleteConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCance
   )
 }
 
-function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0, onDelete, relevantUnits }: {
-  obj: CadenceObjective; weeks: number[]; currentWeekIdx: number
+function ObjRow({ obj, currentWeekIdx, expanded, onToggle, isTopLevel, indentDepth = 0, onDelete, relevantUnits }: {
+  obj: CadenceObjective; currentWeekIdx: number
   expanded: boolean; onToggle: () => void; isTopLevel: boolean
   indentDepth?: number; onDelete?: (id: string) => void
   relevantUnits?: RelevantUnit[]
@@ -110,7 +110,12 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
           <span className="cd-okr-pct">{fmt(obj.progress * 100)}%</span>
         </div>
         <div className="cd-okr-conf-row">
-          <ConfidenceTrend values={obj.confidence} currentIdx={currentWeekIdx} weeks={weeks} size={20} />
+          <span className="cd-okr-week">
+            <ConfidenceCell value={currentWeekIdx > 0 ? ((obj.confidence ?? [])[currentWeekIdx - 1] ?? null) : null} size={20} showNum={false} />
+          </span>
+          <span className="cd-okr-week is-current">
+            <ConfidenceCell value={(obj.confidence ?? [])[currentWeekIdx] ?? null} size={20} showNum={false} current />
+          </span>
         </div>
       </div>
       {(obj.cycle?.label || (relevantUnits && relevantUnits.length > 0)) && (
@@ -132,8 +137,8 @@ function ObjRow({ obj, weeks, currentWeekIdx, expanded, onToggle, isTopLevel, in
   )
 }
 
-function KrRow({ kr, weeks, currentWeekIdx, onDelete }: {
-  kr: CadenceObjective['key_results'][0]; weeks: number[]
+function KrRow({ kr, currentWeekIdx, onDelete }: {
+  kr: CadenceObjective['key_results'][0]
   currentWeekIdx: number; onDelete?: (id: string) => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -163,7 +168,12 @@ function KrRow({ kr, weeks, currentWeekIdx, onDelete }: {
         ) : <span className="cd-okr-pct">{kr.current_value ? 'Done' : 'Not done'}</span>}
       </div>
       <div className="cd-okr-conf-row">
-        <ConfidenceTrend values={kr.confidence} currentIdx={currentWeekIdx} weeks={weeks} size={18} />
+        <span className="cd-okr-week">
+          <ConfidenceCell value={currentWeekIdx > 0 ? ((kr.confidence ?? [])[currentWeekIdx - 1] ?? null) : null} size={18} showNum={false} />
+        </span>
+        <span className="cd-okr-week is-current">
+          <ConfidenceCell value={(kr.confidence ?? [])[currentWeekIdx] ?? null} size={18} showNum={false} current />
+        </span>
       </div>
     </div>
   )
@@ -279,9 +289,8 @@ function AllOKRsTab() {
           <span className="cd-okr-col-status">Status</span>
           <span className="cd-okr-col-progress">Progress</span>
           <div className="cd-okr-conf-header">
-            {weeks.map((w, i) => (
-              <span key={w} className={'cd-okr-week' + (i === currentWeekIdx ? ' is-current' : '')}>W{i + 1}</span>
-            ))}
+            <span className="cd-okr-week">Last week</span>
+            <span className="cd-okr-week is-current">This week</span>
           </div>
         </div>
 
@@ -299,7 +308,7 @@ function AllOKRsTab() {
           const isExpanded = expanded.has(obj.id)
           return (
             <div key={obj.id} className="cd-okr-obj-block">
-              <ObjRow obj={obj} weeks={weeks} currentWeekIdx={currentWeekIdx}
+              <ObjRow obj={obj} currentWeekIdx={currentWeekIdx}
                 expanded={isExpanded} onToggle={() => toggleExpand(obj.id)}
                 isTopLevel={!obj.parent_objective_id}
                 indentDepth={viewMode === 'cascade' ? depth : 0}
@@ -307,7 +316,7 @@ function AllOKRsTab() {
                 relevantUnits={relevantUnitsMap.get(obj.id)}
               />
               {isExpanded && obj.key_results.length > 0 && obj.key_results.map(kr => (
-                <KrRow key={kr.id} kr={kr} weeks={weeks} currentWeekIdx={currentWeekIdx}
+                <KrRow key={kr.id} kr={kr} currentWeekIdx={currentWeekIdx}
                   onDelete={(krId) => handleDeleteKr(obj.id, krId)}
                 />
               ))}
@@ -342,7 +351,7 @@ export function ObjectivesPage() {
 
   async function handleCreate(data: CreateObjectiveInput) {
     if (!user) return
-    const obj = await objectivesService.create({ ...data, owner_id: user.id })
+    const obj = await objectivesService.create({ ...data, owner_id: data.owner_id ?? user.id })
     setRefreshKey(k => k + 1)
     return obj.id
   }
