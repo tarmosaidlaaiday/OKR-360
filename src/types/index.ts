@@ -96,6 +96,7 @@ export interface CreateObjectiveInput {
   parent_objective_id?: string | null
   cycle_id: string
   status: ObjectiveStatus
+  owner_id?: string
 }
 
 export interface UpdateObjectiveInput extends Partial<CreateObjectiveInput> {}

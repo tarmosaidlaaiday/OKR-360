@@ -10,6 +10,7 @@ import { keyResultsService } from '../../services/keyResults.service'
 import { suggestKRs } from '../../services/aiSuggestions.service'
 import { getGuardrailKpis, addGuardrailKpi, removeGuardrailKpi, getKpisForGuardrailPicker } from '../../services/guardrails.service'
 import { getRelevantUnits, addRelevantUnit, removeRelevantUnit } from '../../services/relevance.service'
+import { isOrgOrUnitAdmin } from '../../services/permissions.service'
 import type { RelevantUnit } from '../../services/relevance.service'
 import type { OKRTemplate } from '../../data/okrTemplates'
 import type { Objective, CreateObjectiveInput, ObjectiveStatus } from '../../types'
@@ -186,6 +187,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
   const [stagedRelevantUnitIds, setStagedRelevantUnitIds] = useState<Set<string>>(new Set())
   const [addingRelevantUnit, setAddingRelevantUnit] = useState(false)
 
+  // Owner picker
+  const [ownerId, setOwnerId]           = useState<string>((objective as any)?.owner_id ?? user?.id ?? '')
+  const [people, setPeople]             = useState<{ id: string; full_name: string }[]>([])
+  const [canReassign, setCanReassign]   = useState(false)
+
   // Default cycleId once cycles are available (only when not already set)
   useEffect(() => {
     if (cycleId || isEdit) return
@@ -201,11 +207,17 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     supabase.from('units').select('id, name').order('name').then(({ data }) => {
       setUnits((data ?? []) as UnitOption[])
     })
+    supabase.from('profiles').select('id, full_name').order('full_name').then(({ data }) => {
+      setPeople((data ?? []) as { id: string; full_name: string }[])
+    })
+    if (user?.id) {
+      isOrgOrUnitAdmin(user.id).then(setCanReassign).catch(() => setCanReassign(false))
+    }
     if (isEdit && objective?.id) {
       getGuardrailKpis(objective.id).then(setGuardrails).catch(console.error)
       getRelevantUnits(objective.id).then(setRelevantUnits).catch(console.error)
     }
-  }, [open, refresh, isEdit, objective?.id])
+  }, [open, refresh, isEdit, objective?.id, user?.id])
 
   // Load KPI options for guardrail picker whenever cycle is known (create or edit)
   useEffect(() => {
@@ -236,10 +248,11 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
     setUnitId(objective?.unit_id ?? '')
     setParentId((objective as any)?.parent_objective_id ?? '')
     setStatus(objective?.status ?? 'on_track')
+    setOwnerId((objective as any)?.owner_id ?? user?.id ?? '')
     setError('')
     setKrs([])
     setAiError('')
-  }, [objective])
+  }, [objective, user?.id])
 
   function fromSuggestions(raw: { title: string; target_type: KrTargetType; target_value: number; unit: string | null }[]): KRDraft[] {
     return raw.map(s => ({
@@ -300,6 +313,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         parent_objective_id: parentId || null,
         cycle_id: cycleId,
         status,
+        owner_id: ownerId || user?.id || undefined,
       })
 
       const toCreate = krs.filter(k => k.checked && k.title.trim())
@@ -336,6 +350,7 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
         setTitle(''); setDescription('')
         setCycleId(activeCycle?.id ?? '')
         setUnitId(''); setParentId(''); setStatus('on_track')
+        setOwnerId(user?.id ?? '')
         setKrs([]); setAiError('')
         setStagedGuardrailIds(new Set())
         setStagedRelevantUnitIds(new Set())
@@ -506,6 +521,22 @@ export function ObjectiveForm({ open, onClose, onSubmit, objective }: ObjectiveF
             </select>
           </label>
         </div>
+
+        {/* Owner — always shown in create; in edit only shown to admins/leads */}
+        {(!isEdit || canReassign) && (
+          <label className="cd-field">
+            <span className="cd-field-lbl">Owner</span>
+            <select
+              className="cd-um-select"
+              value={ownerId}
+              onChange={e => setOwnerId(e.target.value)}
+            >
+              {people.map(p => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* Parent objective */}
         {parentOpts.length > 0 && (

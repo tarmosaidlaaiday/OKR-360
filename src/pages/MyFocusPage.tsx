@@ -528,7 +528,7 @@ export function MyFocusPage() {
     const updated = await objectivesService.update(editingObj.id, data)
     setObjectives(prev => prev.map(o =>
       o.id === editingObj.id
-        ? { ...o, title: updated.title, description: updated.description ?? null, status: updated.status as string }
+        ? { ...o, title: updated.title, description: updated.description ?? null, status: updated.status as string, owner_id: updated.owner_id }
         : o
     ))
     setEditingObj(null)
