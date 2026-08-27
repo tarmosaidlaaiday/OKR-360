@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageActionStore } from '../stores/pageActionStore'
-import { useCycle } from '../context/CycleContext'
 import { useAuth } from '../context/AuthContext'
 import { useOneOnOnes } from '../hooks/useOneOnOnes'
 import { Avatar } from '../components/cadence/Avatar'
@@ -17,6 +16,7 @@ import {
   logActivity, getActivityFeed,
 } from '../services/oneOnOnes.service'
 import type { ActivityEntry } from '../services/oneOnOnes.service'
+import { getActiveCycleIds } from '../services/cycles.service'
 import { getMyAllTasks, createPersonalTask, updatePersonalTaskStatus } from '../services/personalTasks.service'
 import { updateKrTaskStatus } from '../services/krTasks.service'
 import { EmptyState } from '../components/cadence/EmptyState'
@@ -335,18 +335,21 @@ function WorkAgenda({ entry, onChange, isSessionManager }: {
 
 // ── OKRs & KPIs tab ───────────────────────────────────────────────────────
 
-function OKRsAgenda({ person, cycleId }: { person: Person; cycleId: string | null }) {
+function OKRsAgenda({ person }: { person: Person }) {
   const [objs, setObjs] = useState<CadenceObjective[]>([])
 
   useEffect(() => {
-    if (!person.id || !cycleId) return
-    supabase
-      .from('objectives')
-      .select('id, title, owner_id, confidence')
-      .eq('cycle_id', cycleId)
-      .eq('owner_id', person.id)
-      .then(({ data }) => setObjs((data ?? []) as any[]))
-  }, [person.id, cycleId])
+    if (!person.id) return
+    getActiveCycleIds().then(activeCycleIds => {
+      if (activeCycleIds.length === 0) return
+      supabase
+        .from('objectives')
+        .select('id, title, owner_id, confidence')
+        .in('cycle_id', activeCycleIds)
+        .eq('owner_id', person.id)
+        .then(({ data }) => setObjs((data ?? []) as any[]))
+    })
+  }, [person.id])
 
   const currentWeekIdx = Math.min((objs[0]?.confidence?.length ?? 1) - 1, 6)
 
@@ -627,7 +630,6 @@ function TasksAgenda({
 type TabId = 'personal' | 'work' | 'okrs' | 'feedback' | 'tasks'
 
 export function OneOnOnesPage() {
-  const { activeCycle } = useCycle()
   const { user, profile } = useAuth()
   const navigate = useNavigate()
   const hook = useOneOnOnes()
@@ -1085,7 +1087,6 @@ export function OneOnOnesPage() {
               {tab === 'okrs' && (
                 <OKRsAgenda
                   person={selectedPerson}
-                  cycleId={activeCycle?.id ?? null}
                 />
               )}
               {tab === 'feedback' && (

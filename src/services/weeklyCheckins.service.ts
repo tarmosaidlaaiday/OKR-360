@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { getISOWeek } from '../lib/cadenceUtils'
+import { getActiveCycleIds } from './cycles.service'
 import type { WeeklyCheckin, CheckinKR, CheckinStreak } from '../types/cadence'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -7,24 +8,6 @@ import type { WeeklyCheckin, CheckinKR, CheckinStreak } from '../types/cadence'
 function currentWeekYear(): { week: number; year: number } {
   const now = new Date()
   return { week: getISOWeek(now), year: now.getFullYear() }
-}
-
-// ── Active cycles for check-in (date-derived, ignores global selector) ───
-
-// Returns ALL cycle IDs that are active for today's date. Multiple cycles
-// can be simultaneously active at different granularities (Year, Half,
-// Quarter). Using the full set means check-in works regardless of which
-// specific granularity an objective happens to be tagged to.
-async function getActiveCycleIds(): Promise<string[]> {
-  const today = new Date().toISOString().split('T')[0]
-  const { data, error } = await supabase
-    .from('cycles')
-    .select('id')
-    .eq('status', 'active')
-    .lte('start_date', today)
-    .gte('end_date', today)
-  if (error) throw error
-  return (data ?? []).map((c: any) => c.id as string)
 }
 
 // ── KRs for stepper ───────────────────────────────────────────────────────
