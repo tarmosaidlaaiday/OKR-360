@@ -5,6 +5,7 @@ import { updateKrTaskStatus } from '../services/krTasks.service'
 import { Avatar } from '../components/cadence/Avatar'
 import { Icon } from '../components/cadence/Icon'
 import { getErrorMessage } from '../lib/errors'
+import { isOverdue } from '../lib/utils'
 import { TaskDetailPanel } from '../components/tasks/TaskDetailPanel'
 import type { UnifiedTask, KrTaskStatus } from '../types/cadence'
 
@@ -13,11 +14,6 @@ import type { UnifiedTask, KrTaskStatus } from '../types/cadence'
 function fmtDate(d: string | null): string {
   if (!d) return ''
   return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-}
-
-function isOverdue(d: string | null, status: KrTaskStatus): boolean {
-  if (!d || status === 'done') return false
-  return new Date(d + 'T00:00:00') < new Date(new Date().toDateString())
 }
 
 // ── Task check button ─────────────────────────────────────────────────────

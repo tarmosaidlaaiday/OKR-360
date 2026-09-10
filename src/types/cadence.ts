@@ -338,10 +338,10 @@ export interface PersonalTask {
   updated_at: string
 }
 
-// Unified task aggregating kr_tasks + personal_tasks for the Tasks page
+// Unified task aggregating kr_tasks + personal_tasks (+ team meeting commitments) for the Tasks page
 export interface UnifiedTask {
   id: string
-  source: 'kr' | 'personal'
+  source: 'kr' | 'personal' | 'commitment'
   title: string
   description?: string | null
   status: KrTaskStatus

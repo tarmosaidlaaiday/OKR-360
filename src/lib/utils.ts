@@ -1,7 +1,13 @@
 import type { KeyResult } from '../types'
+import type { KrTaskStatus } from '../types/cadence'
 
 export function cn(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(' ')
+}
+
+export function isOverdue(d: string | null, status: KrTaskStatus): boolean {
+  if (!d || status === 'done') return false
+  return new Date(d + 'T00:00:00') < new Date(new Date().toDateString())
 }
 
 export function computeObjectiveProgress(keyResults: KeyResult[]): number {

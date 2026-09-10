@@ -172,3 +172,157 @@ export async function getMyAllTasks(userId: string): Promise<UnifiedTask[]> {
   })
   return all
 }
+
+// ── Unit-wide task aggregation ────────────────────────────────────────────────
+// Same query shape as getMyAllTasks, extended to cover every person in a unit
+// plus team_meeting_commitments as a third source.
+
+export async function getUnitTasks(unitId: string): Promise<UnifiedTask[]> {
+  // 1. Get all current unit members
+  const { data: members, error: membersError } = await supabase
+    .from('people_units')
+    .select('person_id')
+    .eq('unit_id', unitId)
+  if (membersError) throw membersError
+  const memberIds = (members ?? []).map((m: any) => m.person_id)
+  if (memberIds.length === 0) return []
+
+  // 2. Fetch open personal_tasks + kr_tasks (reuse exact same query shape as getMyAllTasks)
+  const [personalResult, krResult, commitmentResult] = await Promise.all([
+    supabase
+      .from('personal_tasks')
+      .select(`
+        id, title, description, status, due_date, assignee_id, one_on_one_id,
+        assignee:profiles!assignee_id(id, full_name, avatar_url, color),
+        one_on_one:one_on_ones!one_on_one_id(
+          id, scheduled_at, manager_id, report_id,
+          manager:profiles!manager_id(id, full_name),
+          report:profiles!report_id(id, full_name)
+        )
+      `)
+      .in('assignee_id', memberIds)
+      .neq('status', 'done'),
+
+    supabase
+      .from('kr_tasks')
+      .select(`
+        id, title, description, status, due_date, assignee_id, key_result_id,
+        assignee:profiles!assignee_id(id, full_name, avatar_url, color),
+        key_result:key_results!key_result_id(
+          id, title,
+          objective:objectives!objective_id(id, title)
+        )
+      `)
+      .in('assignee_id', memberIds)
+      .neq('status', 'done'),
+
+    // Open team_meeting_commitments: where linked task is not done (or has no task)
+    supabase
+      .from('team_meeting_commitments')
+      .select(`
+        id, person_id, description, carried_forward_from_id,
+        linked_task:personal_tasks!linked_task_id(id, status, due_date),
+        meeting:team_meetings!team_meeting_id(id, scheduled_at, unit:units!unit_id(id, name))
+      `)
+      .in('person_id', memberIds),
+  ])
+
+  if (personalResult.error) throw personalResult.error
+  if (krResult.error) throw krResult.error
+  if (commitmentResult.error) throw commitmentResult.error
+
+  // ── personal tasks (same transform as getMyAllTasks) ──
+  const personal: UnifiedTask[] = ((personalResult.data ?? []) as any[]).map(row => {
+    const assignee = Array.isArray(row.assignee) ? (row.assignee[0] ?? null) : row.assignee
+    const oo = Array.isArray(row.one_on_one) ? (row.one_on_one[0] ?? null) : row.one_on_one
+
+    let source_label = 'Personal'
+    if (oo) {
+      const me = row.assignee_id
+      const otherRaw = oo.manager_id === me ? oo.report : oo.manager
+      const other = Array.isArray(otherRaw) ? (otherRaw[0] ?? null) : otherRaw
+      const otherName: string = other?.full_name ?? 'someone'
+      const date = oo.scheduled_at
+        ? new Date(oo.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        : ''
+      source_label = `1:1 with ${otherName}${date ? `, ${date}` : ''}`
+    }
+
+    return {
+      id: row.id,
+      source: 'personal' as const,
+      title: row.title,
+      description: row.description ?? null,
+      status: row.status,
+      due_date: row.due_date ?? null,
+      assignee_id: row.assignee_id,
+      assignee,
+      source_label,
+      one_on_one_id: row.one_on_one_id ?? null,
+    }
+  })
+
+  // ── kr tasks (same transform as getMyAllTasks) ──
+  const kr: UnifiedTask[] = ((krResult.data ?? []) as any[]).map(row => {
+    const assignee = Array.isArray(row.assignee) ? (row.assignee[0] ?? null) : row.assignee
+    const krRow = Array.isArray(row.key_result) ? (row.key_result[0] ?? null) : row.key_result
+    const objRow = krRow
+      ? (Array.isArray(krRow.objective) ? (krRow.objective[0] ?? null) : krRow.objective)
+      : null
+    const krTitle: string = krRow?.title ?? 'Key result'
+    const objTitle: string = objRow?.title ?? ''
+    const source_label = objTitle ? `${objTitle} · ${krTitle}` : krTitle
+
+    return {
+      id: row.id,
+      source: 'kr' as const,
+      title: row.title,
+      description: row.description ?? null,
+      status: row.status,
+      due_date: row.due_date ?? null,
+      assignee_id: row.assignee_id,
+      assignee,
+      source_label,
+      key_result_id: row.key_result_id,
+    }
+  })
+
+  // ── commitment items (third source, with meeting context) ──
+  // Filter client-side: only open commitments (linked task not done, or no linked task)
+  const commitment: UnifiedTask[] = ((commitmentResult.data ?? []) as any[])
+    .filter(row => {
+      const task = Array.isArray(row.linked_task) ? (row.linked_task[0] ?? null) : row.linked_task
+      return !task || task.status !== 'done'
+    })
+    .map(row => {
+      const task = Array.isArray(row.linked_task) ? (row.linked_task[0] ?? null) : row.linked_task
+      const meeting = Array.isArray(row.meeting) ? (row.meeting[0] ?? null) : row.meeting
+      const unit = meeting ? (Array.isArray(meeting.unit) ? (meeting.unit[0] ?? null) : meeting.unit) : null
+      const date = meeting?.scheduled_at
+        ? new Date(meeting.scheduled_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        : ''
+      const unitName: string = unit?.name ?? 'Team meeting'
+      const source_label = `${unitName}${date ? `, ${date}` : ''}`
+
+      return {
+        id: row.id,
+        source: 'commitment' as const,
+        title: row.description,
+        description: null,
+        status: (task?.status ?? 'todo') as KrTaskStatus,
+        due_date: task?.due_date ?? null,
+        assignee_id: row.person_id,
+        assignee: null,   // enriched below if needed; leads see names from participants
+        source_label,
+      }
+    })
+
+  const all = [...personal, ...kr, ...commitment]
+  all.sort((a, b) => {
+    if (!a.due_date && !b.due_date) return 0
+    if (!a.due_date) return 1
+    if (!b.due_date) return -1
+    return a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0
+  })
+  return all
+}

@@ -395,7 +395,7 @@ export function TaskDetailPanel({ task, onClose, onTaskUpdate }: TaskDetailPanel
           </div>
 
           {/* Attachments */}
-          {user?.id && (
+          {user?.id && task.source !== 'commitment' && (
             <AttachmentsSection
               taskId={task.id}
               source={task.source}

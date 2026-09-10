@@ -21,6 +21,7 @@ import { ProgressBar } from '../components/cadence/ProgressBar'
 import { Icon } from '../components/cadence/Icon'
 import { supabase } from '../lib/supabase'
 import { fmt, getCurrentWeekIdx, profileToPerson } from '../lib/cadenceUtils'
+import { isOverdue } from '../lib/utils'
 import type { CadenceObjective, CadenceKeyResult, KrTask, KrTaskStatus, UnifiedTask } from '../types/cadence' // GuardrailKpi hidden with Guardrail UI
 import type { CreateObjectiveInput, Objective } from '../types'
 import type { LinkedKpiSummary } from '../services/kpis.service'
@@ -84,10 +85,6 @@ function fmtDate(d: string | null): string {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-function isOverdue(d: string | null, status: KrTaskStatus): boolean {
-  if (!d || status === 'done') return false
-  return new Date(d + 'T00:00:00') < new Date(new Date().toDateString())
-}
 
 // ── Task check button: cycles todo → in_progress → done → todo ───────────
 
