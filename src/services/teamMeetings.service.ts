@@ -338,6 +338,127 @@ export async function carryForwardCommitment(params: {
   return normalise<TeamMeetingCommitment>(data)
 }
 
+// ── Deviation detection ───────────────────────────────────────────────────────
+
+export interface DecliningKR {
+  kr_id: string
+  kr_title: string
+  objective_title: string
+  owner_name: string
+  values: number[]  // last 3 confidence values, oldest→newest
+}
+
+/**
+ * Returns key results for unit members where confidence has dropped in each of
+ * the last 2 consecutive logged check-ins (i.e. last 3 values a > b > c).
+ * Queries confidence_logs for the current year; needs at least 3 entries per KR.
+ */
+export async function getDecliningConfidenceKRs(
+  unitId: string,
+  cycleId: string | null,
+): Promise<DecliningKR[]> {
+  // Get unit member ids
+  const { data: members } = await supabase
+    .from('people_units')
+    .select('person_id')
+    .eq('unit_id', unitId)
+  const memberIds = (members ?? []).map((m: any) => m.person_id)
+  if (memberIds.length === 0) return []
+
+  // Get objectives + KRs for those members
+  let objQ = supabase
+    .from('objectives')
+    .select(`
+      id, title,
+      owner:profiles!owner_id(id, full_name),
+      key_results(id, title)
+    `)
+    .in('owner_id', memberIds)
+  if (cycleId) objQ = objQ.eq('cycle_id', cycleId)
+
+  const { data: objs } = await objQ
+  if (!objs || objs.length === 0) return []
+
+  // Collect KR metadata indexed by id
+  const krMeta: Record<string, { kr_title: string; objective_title: string; owner_name: string }> = {}
+  const krIds: string[] = []
+  for (const obj of objs as any[]) {
+    const objTitle: string = obj.title ?? ''
+    const owner = Array.isArray(obj.owner) ? obj.owner[0] : obj.owner
+    const ownerName: string = owner?.full_name ?? ''
+    for (const kr of obj.key_results ?? []) {
+      krMeta[kr.id] = { kr_title: kr.title, objective_title: objTitle, owner_name: ownerName }
+      krIds.push(kr.id)
+    }
+  }
+  if (krIds.length === 0) return []
+
+  // Fetch confidence logs for these KRs (current year, ordered by week asc)
+  const currentYear = new Date().getFullYear()
+  const { data: logs } = await supabase
+    .from('confidence_logs')
+    .select('key_result_id, week, year, value')
+    .in('key_result_id', krIds)
+    .in('year', [currentYear - 1, currentYear])
+    .order('year', { ascending: true })
+    .order('week', { ascending: true })
+
+  if (!logs || logs.length === 0) return []
+
+  // Group by KR, keep last 3 values
+  const byKr: Record<string, number[]> = {}
+  for (const log of logs as any[]) {
+    if (!byKr[log.key_result_id]) byKr[log.key_result_id] = []
+    byKr[log.key_result_id].push(log.value)
+  }
+
+  const declining: DecliningKR[] = []
+  for (const [krId, values] of Object.entries(byKr)) {
+    if (values.length < 3) continue
+    const last3 = values.slice(-3)  // [oldest, middle, newest]
+    if (last3[1] < last3[0] && last3[2] < last3[1]) {
+      declining.push({
+        kr_id: krId,
+        kr_title: krMeta[krId]?.kr_title ?? krId,
+        objective_title: krMeta[krId]?.objective_title ?? '',
+        owner_name: krMeta[krId]?.owner_name ?? '',
+        values: last3,
+      })
+    }
+  }
+  return declining
+}
+
+/**
+ * Returns commitments in the current meeting whose carried_forward_from_id chain
+ * is 2 or more levels deep — meaning the item has been carried forward more than once.
+ * Only needs to walk 2 levels to detect depth ≥ 2.
+ */
+export async function getDeepCarryForwardCommitments(
+  commitments: TeamMeetingCommitment[],
+): Promise<TeamMeetingCommitment[]> {
+  const withParent = commitments.filter(c => c.carried_forward_from_id != null)
+  if (withParent.length === 0) return []
+
+  const level1Ids = withParent.map(c => c.carried_forward_from_id as string)
+
+  // Fetch level-1 parents; check if they themselves have a carried_forward_from_id
+  const { data: level1 } = await supabase
+    .from('team_meeting_commitments')
+    .select('id, carried_forward_from_id')
+    .in('id', level1Ids)
+
+  if (!level1 || level1.length === 0) return []
+
+  const deepParentIds = new Set(
+    (level1 as any[])
+      .filter(p => p.carried_forward_from_id != null)
+      .map(p => p.id as string)
+  )
+
+  return withParent.filter(c => deepParentIds.has(c.carried_forward_from_id as string))
+}
+
 // ── Previous meeting ──────────────────────────────────────────────────────────
 
 /**

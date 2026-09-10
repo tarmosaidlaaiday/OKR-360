@@ -8,18 +8,21 @@ import { Icon } from '../components/cadence/Icon'
 import { EmptyState } from '../components/cadence/EmptyState'
 import { supabase } from '../lib/supabase'
 import { objectiveProgress } from '../lib/cadenceUtils'
+import { isOverdue } from '../lib/utils'
 import { getUnitMembers } from '../services/peopleUnits.service'
+import { getUnitTasks } from '../services/personalTasks.service'
 import {
   getLeadableUnits, canManageUnit,
   getMeetingsForUnit, getMeeting, createMeeting, updateMeeting, completeMeeting,
   getParticipants, addParticipant, removeParticipant, autoPopulateParticipants,
   getCommitments, addCommitment, carryForwardCommitment,
-  getPreviousMeeting,
+  getPreviousMeeting, getDecliningConfidenceKRs, getDeepCarryForwardCommitments,
 } from '../services/teamMeetings.service'
 import type {
   Unit, TeamMeeting, TeamMeetingParticipant, TeamMeetingCommitment,
-  TeamMeetingRecurrence, CadenceObjective, CadenceKeyResult, PeopleUnit,
+  TeamMeetingRecurrence, CadenceObjective, CadenceKeyResult, PeopleUnit, UnifiedTask,
 } from '../types/cadence'
+import type { DecliningKR } from '../services/teamMeetings.service'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -347,6 +350,209 @@ function PrevMeetingPanel({ prevMeeting, currentMeeting, orgId, currentUserId, a
   )
 }
 
+// ── Signal label badges ───────────────────────────────────────────────────────
+
+const SIGNAL_LABELS: Record<string, { label: string; color: string }> = {
+  declining_confidence: { label: 'Declining confidence', color: '#9A6A11' },
+  overdue:             { label: 'Overdue',              color: '#B23A3A' },
+  repeatedly_carried:  { label: 'Stuck — carried 2×+', color: '#7C3A9A' },
+}
+
+function SignalBadge({ signal }: { signal: keyof typeof SIGNAL_LABELS }) {
+  const { label, color } = SIGNAL_LABELS[signal]
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, letterSpacing: '.04em', padding: '2px 7px',
+      borderRadius: 4, background: color + '18', color,
+    }}>
+      {label}
+    </span>
+  )
+}
+
+// ── Needs Attention section ───────────────────────────────────────────────────
+
+interface NeedsAttentionProps {
+  meeting: TeamMeeting
+  cycleId: string | null
+  unitTasks: UnifiedTask[]
+  commitments: TeamMeetingCommitment[]
+}
+
+function NeedsAttentionSection({ meeting, cycleId, unitTasks, commitments }: NeedsAttentionProps) {
+  const [decliningKRs, setDecliningKRs] = useState<DecliningKR[]>([])
+  const [deepCarried, setDeepCarried] = useState<TeamMeetingCommitment[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      getDecliningConfidenceKRs(meeting.unit_id, cycleId),
+      getDeepCarryForwardCommitments(commitments),
+    ]).then(([declining, deep]) => {
+      setDecliningKRs(declining)
+      setDeepCarried(deep)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [meeting.unit_id, cycleId, commitments])
+
+  const overdueItems = unitTasks.filter(t => isOverdue(t.due_date, t.status))
+
+  const totalSignals = decliningKRs.length + overdueItems.length + deepCarried.length
+
+  if (!loading && totalSignals === 0) return null
+
+  return (
+    <section className="cd-tm-section" style={{ borderLeft: '3px solid #B23A3A', paddingLeft: 14 }}>
+      <div className="cd-tm-section-hd">
+        <Icon name="alertTriangle" size={14} />
+        <span style={{ color: '#B23A3A', fontWeight: 700 }}>Needs attention</span>
+        {!loading && <span style={{ fontSize: 12, color: '#B23A3A', opacity: 0.7 }}>{totalSignals} signal{totalSignals !== 1 ? 's' : ''}</span>}
+      </div>
+
+      {loading && <p className="cd-loading" style={{ fontSize: 12, padding: '4px 0' }}>Checking…</p>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Declining confidence */}
+        {decliningKRs.map(kr => (
+          <div key={kr.kr_id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <SignalBadge signal="declining_confidence" />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{kr.kr_title}</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-dim)' }}>
+              {kr.objective_title && <span>{kr.objective_title} · </span>}
+              {kr.owner_name && <span>{kr.owner_name} · </span>}
+              Confidence: {kr.values.join(' → ')}
+            </div>
+          </div>
+        ))}
+
+        {/* Overdue items */}
+        {overdueItems.map(t => (
+          <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <SignalBadge signal="overdue" />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{t.title}</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-dim)' }}>
+              {t.assignee?.full_name && <span>{t.assignee.full_name} · </span>}
+              {t.source_label}
+              {t.due_date && <span> · Due {new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
+            </div>
+          </div>
+        ))}
+
+        {/* Repeatedly carried commitments */}
+        {deepCarried.map(c => (
+          <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <SignalBadge signal="repeatedly_carried" />
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{c.description}</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-dim)' }}>
+              {c.person?.full_name && <span>{c.person.full_name} · </span>}
+              Carried forward more than once without being resolved
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// ── Accountability overview section ───────────────────────────────────────────
+
+function AccountabilitySection({ unitId, isManager }: { unitId: string; isManager: boolean }) {
+  const [tasks, setTasks] = useState<UnifiedTask[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!isManager) { setLoading(false); return }
+    setLoading(true)
+    getUnitTasks(unitId).then(t => { setTasks(t); setLoading(false) }).catch(() => setLoading(false))
+  }, [unitId, isManager])
+
+  if (!isManager) return null
+
+  // Group by assignee_id
+  const byPerson: Record<string, UnifiedTask[]> = {}
+  for (const t of tasks) {
+    const key = t.assignee_id ?? 'unknown'
+    if (!byPerson[key]) byPerson[key] = []
+    byPerson[key].push(t)
+  }
+
+  const personEntries = Object.entries(byPerson)
+
+  return (
+    <section className="cd-tm-section">
+      <div className="cd-tm-section-hd">
+        <Icon name="users" size={14} />
+        <span>Team accountability</span>
+        {!loading && tasks.length > 0 && (
+          <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{tasks.length} open</span>
+        )}
+      </div>
+
+      {loading && <p className="cd-loading" style={{ fontSize: 12, padding: '4px 0' }}>Loading…</p>}
+
+      {!loading && tasks.length === 0 && (
+        <p style={{ fontSize: 13, color: 'var(--ink-faint)', margin: 0 }}>No open items across the team.</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {personEntries.map(([personId, items]) => {
+          const sample = items[0]
+          const assignee = sample?.assignee
+          const name = assignee?.full_name ?? personId
+          return (
+            <div key={personId}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                <Avatar
+                  person={assignee ? { id: personId, name, color: assignee.color, avatar_url: assignee.avatar_url, role: '', initials: name.charAt(0) } : null}
+                  size={22}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{name}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>{items.length} open</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, paddingLeft: 29 }}>
+                {items.map(t => {
+                  const overdue = isOverdue(t.due_date, t.status)
+                  return (
+                    <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: overdue ? 'var(--danger, #B23A3A)' : undefined }}>
+                          {overdue && '⚠ '}{t.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-faint)', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                          <span style={{
+                            padding: '1px 5px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+                            background: t.source === 'kr' ? '#3b82f618' : t.source === 'commitment' ? '#7C3A9A18' : 'var(--ink-faint)',
+                            color: t.source === 'kr' ? '#3b82f6' : t.source === 'commitment' ? '#7C3A9A' : 'var(--ink-dim)',
+                          }}>
+                            {t.source === 'kr' ? 'OKR task' : t.source === 'commitment' ? 'Commitment' : 'Task'}
+                          </span>
+                          <span>{t.source_label}</span>
+                          {t.due_date && (
+                            <span style={{ color: overdue ? '#B23A3A' : undefined }}>
+                              Due {new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 // ── Results review section ────────────────────────────────────────────────────
 
 function ResultsSection({ unitId, cycleId }: { unitId: string; cycleId: string | null }) {
@@ -587,6 +793,7 @@ function MeetingDetail({ meeting, userId, orgId, cycleId, isManager, onCompleted
   const [unitMembers, setUnitMembers] = useState<PeopleUnit[]>([])
   const [addingParticipant, setAddingParticipant] = useState(false)
   const [addPersonId, setAddPersonId] = useState('')
+  const [unitTasksForSignals, setUnitTasksForSignals] = useState<UnifiedTask[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Already-carried commitment IDs (from previous meeting, now in current)
@@ -605,11 +812,13 @@ function MeetingDetail({ meeting, userId, orgId, cycleId, isManager, onCompleted
       getCommitments(meeting.id),
       getPreviousMeeting(meeting.unit_id, meeting.scheduled_at),
       getUnitMembers(meeting.unit_id),
-    ]).then(([p, c, prev, members]) => {
+      isManager ? getUnitTasks(meeting.unit_id) : Promise.resolve([]),
+    ]).then(([p, c, prev, members, tasks]) => {
       setParticipants(p)
       setCommitments(c)
       setPrevMeeting(prev)
       setUnitMembers(members)
+      setUnitTasksForSignals(tasks as UnifiedTask[])
     })
   }, [meeting.id, meeting.unit_id, meeting.scheduled_at, meeting.plan_notes])
 
@@ -737,6 +946,16 @@ function MeetingDetail({ meeting, userId, orgId, cycleId, isManager, onCompleted
         </div>
       </section>
 
+      {/* Needs attention — leads only, shown at top so they walk in prepared */}
+      {isManager && (
+        <NeedsAttentionSection
+          meeting={meeting}
+          cycleId={cycleId}
+          unitTasks={unitTasksForSignals}
+          commitments={commitments}
+        />
+      )}
+
       {/* Previous meeting */}
       {prevMeeting && (
         <PrevMeetingPanel
@@ -751,6 +970,9 @@ function MeetingDetail({ meeting, userId, orgId, cycleId, isManager, onCompleted
 
       {/* Results review */}
       <ResultsSection unitId={meeting.unit_id} cycleId={cycleId} />
+
+      {/* Team accountability overview — leads only */}
+      <AccountabilitySection unitId={meeting.unit_id} isManager={isManager} />
 
       {/* Next-period plan */}
       <section className="cd-tm-section">
