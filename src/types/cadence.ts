@@ -377,3 +377,42 @@ export function levelColor(depth: number | undefined | null): string {
   if (depth == null) return '#888'
   return LEVEL_COLORS[Math.min(depth, LEVEL_COLORS.length - 1)]
 }
+
+// ── Team Meetings ─────────────────────────────────────────────────────────────
+
+export type TeamMeetingRecurrence = 'none' | 'weekly' | 'biweekly' | 'monthly'
+export type TeamMeetingStatus = 'scheduled' | 'completed' | 'cancelled'
+
+export interface TeamMeeting {
+  id: string
+  unit_id: string
+  org_id: string
+  cycle_id: string | null
+  scheduled_at: string
+  recurrence: TeamMeetingRecurrence
+  status: TeamMeetingStatus
+  plan_notes: string | null
+  created_by: string
+  created_at: string
+  unit?: { id: string; name: string } | null
+}
+
+export interface TeamMeetingParticipant {
+  id: string
+  team_meeting_id: string
+  person_id: string
+  person?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
+}
+
+export interface TeamMeetingCommitment {
+  id: string
+  team_meeting_id: string
+  person_id: string
+  description: string
+  linked_task_id: string | null
+  carried_forward_from_id: string | null
+  created_at: string
+  person?: { id: string; full_name: string; avatar_url: string | null; color: string } | null
+  linked_task?: { id: string; status: KrTaskStatus; title: string } | null
+  carried_forward_from?: { id: string; team_meeting_id: string; description: string } | null
+}

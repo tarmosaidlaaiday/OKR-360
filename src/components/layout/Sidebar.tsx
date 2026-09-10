@@ -13,6 +13,7 @@ const MAIN_NAV = [
   // { to: '/kpis', icon: 'chart' as const, label: 'KPIs' }, // hidden: UPDATE RLS bug pending fix
   { to: '/tasks',              icon: 'task'        as const, label: 'Tasks'      },
   { to: '/people',             icon: 'users'       as const, label: 'People'     },
+  { to: '/team-meetings',      icon: 'calendar'    as const, label: 'Team mtgs'  },
   { to: '/history',            icon: 'history'     as const, label: 'History'    },
   { to: '/analytics',          icon: 'chartLine'   as const, label: 'Analytics'  },
 ]
@@ -26,6 +27,7 @@ const ORG_NAV = [
 const ACTIVE_PREFIXES: Record<string, string[]> = {
   '/objectives': ['/objectives', '/my-focus', '/my-contribution', '/cascade'],
   '/people':     ['/people', '/1on1s', '/scorecard'],
+  '/team-meetings': ['/team-meetings'],
   '/settings/structure': ['/settings/structure', '/cycles', '/settings/my-units'],
 }
 

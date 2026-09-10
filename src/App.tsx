@@ -39,6 +39,7 @@ import { RetroPage } from './pages/RetroPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { PendingApprovalPage } from './pages/PendingApprovalPage'
 import { TasksPage } from './pages/TasksPage'
+import { TeamMeetingsPage } from './pages/TeamMeetingsPage'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 export default function App() {
@@ -91,6 +92,7 @@ export default function App() {
                     <Route path="/retro"                       element={<RetroPage />} />
                     <Route path="/history"                     element={<HistoryPage />} />
                     <Route path="/tasks"                       element={<TasksPage />} />
+                    <Route path="/team-meetings"              element={<TeamMeetingsPage />} />
 
                     {/* Admin-only routes: require org-admin or unit-admin/lead role */}
                     <Route element={<AdminRoute />}>
